@@ -1,0 +1,15 @@
+# 秘匿情報
+.env
+システムファイル/credentials.json
+システムファイル/token.json
+
+# 個人情報・社内資料（入力データは実行時データのため全除外）
+入力データ/
+出力PDF/
+
+# Python キャッシュ
+__pycache__/
+*.pyc
+
+# Claude Code 設定
+.claude/settings.local.json

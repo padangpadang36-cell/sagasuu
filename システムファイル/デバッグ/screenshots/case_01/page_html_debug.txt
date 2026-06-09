@@ -1,0 +1,116 @@
+
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-52Q34H5"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+
+
+
+<a name="top"></a>
+<table width="960" border="0" align="center" cellpadding="0" cellspacing="0" class="widthBase">
+  
+  
+    <tbody><tr>
+      <td class="header-conts" id="headerHight">
+        
+        
+
+
+
+
+
+
+<script type="text/javascript" src="../js/ATBB.js?2.169.0"></script>
+
+<script src="../js/mobile/jquery-3.1.1.min.js?2.169.0"></script>
+
+    <script type="text/javascript">
+    <!--
+      var ATBB = ATBB || {};
+      ATBB.warRevision = "2.169.0";
+    -->
+    </script>
+
+<style type="text/css">
+  a:link.memberspoint { color: #ff0000; }
+  a:visited.memberspoint { color: #ff0000; }
+  a:hover.memberspoint { color: #f0000; }
+  a:active.memberspoint { color: #ff0000; }
+</style>
+
+<form name="bfcm003s" method="post" onsubmit="return handleOnsubmit(this)">
+</form>
+
+<table width="960" border="0" align="center" cellpadding="0" cellspacing="0" style="position: relative;">
+  <tbody><tr>
+    <td width="276" align="left" class="header-logo"><img src="../images/logo_atbb2.gif" width="216" height="90"></td>
+  
+  
+  
+  
+  
+  
+  
+    
+      <td width="578" align="right" class="pad05">
+        <table border="0">
+          <tbody><tr>
+            <td align="right">
+              <table class="right-wrap">
+                <tbody><tr>
+                  <td>
+                    
+                    <p>
+                      <i class="fa-solid fa-user"></i>
+                      (株)社宅．ｃｏｍ&nbsp; 照屋　純一<br>
+                      
+                        <span class="small">前回利用時間：2026/05/13 08:01</span>
+                      
+                    </p>
+                    <button id="modalBtnHelp" class="decorat help">
+                      <img src="../images/helpIcon.svg" alt="" width="15" height="15" class="">
+                      <span>ヘルプ</span>
+                      <i class="fa-solid fa-angle-down"></i>
+                    </button>
+                    <button id="modalBtnLock" class="decorat lock">
+                        <i class="fa-solid fa-user-lock" style="color: #222222;"></i>
+                        <i class="fa-solid fa-angle-down "></i>
+                    </button>
+                    
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+<script type="text/javascript" src="../js/header_menu.js?2.169.0"></script>
+
+
+  
+    <script src="../js/mobile/jquery-3.1.1.min.js?2.169.0"></script>
+    <script>
+      
+      <!--
+        var $311 = $.noConflict(true);
+        (function($){
+          $311(function(){
+            // メンバーズポイントを取得
+            $311.ajax({
+              url : "bfcm003s804",
+              dataType : "text",
+              timeout:10000,
+              cache : false,
+            })
+            .done(function(response) {
+              var data = $311.parseJSON(response.replace("viewModel","\"viewModel\"")).viewModel;
+              docume

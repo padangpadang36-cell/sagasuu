@@ -1,0 +1,324 @@
+<!DOCTYPE html><html><head>
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script type="text/javascript" async="" src="https://www.googletagmanager.com/gtag/js?id=G-L0N9BTPJRE&amp;cx=c&amp;gtm=4e65l0"></script><script type="text/javascript" async="" src="https://www.google-analytics.com/analytics.js"></script><script type="text/javascript" async="" src="https://www.googletagmanager.com/gtag/js?id=G-WQKLM0HB7G&amp;cx=c&amp;gtm=4e65l0"></script><script async="" src="https://www.googletagmanager.com/gtm.js?id=GTM-PSCFVT5"></script><script async="" src="https://www.googletagmanager.com/gtag/js?id=UA-129304110-1"></script>
+        <script>
+              (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0], j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-PSCFVT5');
+         </script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'UA-129304110-1');
+        </script>
+        <meta charset="utf-8">        <link href="/dp/favicon.ico" type="image/x-icon" rel="icon"><link href="/dp/favicon.ico" type="image/x-icon" rel="shortcut icon">        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>新D-rooｍNAVIシステム</title>
+        <meta name="description" content="">
+        <meta name="author" content="">
+        
+                <!-- Bootstrap Core CSS -->
+        <link rel="stylesheet" href="/dp/css/bootstrap.min.css?v830794026">        <!-- Custom CSS -->
+        <link rel="stylesheet" href="/dp/css/base_template/simple-sidebar.css">        <link rel="stylesheet" href="/dp/fonts/buysell/style.css">        <link rel="stylesheet" href="/dp/css/base_template/bb.css?v190227654">        <link rel="stylesheet" href="/dp/css/base_template/bb-btn.css?v1062901896">        <link rel="stylesheet" href="/dp/css/app.css">        <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+        <!--[if IE 9]>
+        <link rel="stylesheet" href="/dp/css/base_template/ie9.css"/>       <![endif]-->
+        <!--[if lt IE 9]>
+        <link rel="stylesheet" href="/dp/css/base_template/ie8.css"/>        <script src="/dp/js/base-js/html5shiv.js?v749555063"></script>        <script src="/dp/js/base-js/respond.min.js?v783179534"></script>        <![endif]-->
+        <!-- Custom CSS -->
+        <!-- Main Script -->
+        <script src="/dp/js/jquery.min.js?v651399917"></script>        <script src="/dp/js/jquery.cookie.js?v1976893031"></script>        <script src="/dp/js/jquery.fileDownload.js?v1182472111"></script>        <script src="/dp/js/jquery.validate.min.js?v308968376"></script>        <script src="/dp/js/katakanaUtils.js?v1293832636"></script>        <script src="/dp/js/jquery.validate.customize.js?v839664280"></script>        <script src="/dp/js/utils.js?v1891100107"></script>        <script src="/dp/js/modal.js?v664236689"></script>        <script src="/dp/js/app.js?v1530363087"></script>
+        <!-- Custom JS Lib -->
+                <script type="text/javascript">
+            var app = app || {};
+            app.utils = new app._utils({
+                // Common title and message
+                "ignoreTownName": ["\u4ee5\u4e0b\u306b\u63b2\u8f09\u304c\u306a\u3044\u5834\u5408"]            });
+            app.modal = new app._modal({
+                // Common title and message
+            });
+        </script>
+    </head>
+    <body class="unie8" style="min-width: 1054px;" data-behave_send_flg_23cf7deecc5726711d6dd2ed84958047="1">
+        <noscript>
+              <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PSCFVT5" height="0" width="0" style="display:none;visibility:hidden"></iframe>
+      </noscript>
+        <div id="container">
+            <style>
+    @media screen and (max-width:1100px){
+        .container-fluid .navbar-brand{
+            margin-left: -45px;
+        }
+    }
+    .navbar-brand-sub img{
+        padding:39px 0
+    }
+    .navbar-brand-sub{
+        color:#fff !important;
+    }
+    .common-logout{cursor: pointer;}
+</style>
+<script>
+    var baseUrl = "https://anavi.daiwaliving.co.jp/dp/";
+    var chintaimenubackurl = "https://anavi.daiwaliving.co.jp/lv/menu";
+    function common_logout($this) {
+        var ret = false;
+        if ($('.common-logout').hasClass("logout-check") && !$('.common-logout').hasClass("jump")) {
+            var formCount = document.forms.length;
+            for (var i = 0; i < formCount; i++) {
+                var formId = document.forms[i].id;
+
+                var oForm = document.getElementById(formId);
+                var check = app.utils.formIsDirty(oForm);
+                if (check === true) {
+                    ret = true;
+                }
+            }
+            if (ret) {
+                showConfirmDialog('ページの移動をしようとしています。編集したデータの内容を破棄して画面遷移をしてよろしいですか？', '', function () {
+                    window.location.href = $this.getAttribute('_href');
+                });
+            } else {
+                window.location.href = $this.getAttribute('_href');
+            }
+        } else {
+            if (!$('.common-logout').hasClass("jump"))
+                window.location.href = $this.getAttribute('_href');
+        }
+    }
+    function chintaimenuback() {
+        if ($('.breadcrumb-pointer').length > 0) {
+            if ($('.breadcrumb-pointer')[0].attributes['onclick'] != null && $('.breadcrumb-pointer')[0].attributes['onclick'] != undefined) {
+                var $str = $('.breadcrumb-pointer')[0].attributes['onclick'].nodeValue;
+                var oForm = document.getElementById($str.split("'")[1]);
+                var check = app.utils.formIsDirty(oForm);
+                if (check === true) {
+                    showConfirmDialog('ページの移動をしようとしています。編集したデータの内容を破棄して画面遷移をしてよろしいですか？', '', function () {
+                        window.location.href = chintaimenubackurl;
+                    }, function (ret) {
+                        ret = false;
+                    });
+                } else {
+                    window.location.href = chintaimenubackurl;
+                }
+            } else {
+                window.location.href = chintaimenubackurl;
+            }
+        } else {
+            window.location.href = chintaimenubackurl;
+        }
+    }
+        
+    //CRMから連携された物件を破棄すること確認
+    function clearCrmRoomIdMsg(herfUrl,okFun,request_cd,msg){
+            if(request_cd){
+                if(herfUrl){
+                    if(!msg){
+                        msg = "ページの移動をしようとしています。CRMから連携された反響情報を破棄して画面遷移をしてよろしいですか？ ";
+                    }
+                    showConfirmDialog(msg, '', function(){
+                    if(!okFun){
+                        //画面遷移
+                        window.location.href = herfUrl;
+                    }else{
+                        //関数実行
+                        okFun();
+                    }
+                   }, function(){
+                    $('#confirm_dialog').modal("hide");
+                   }, '', 'はい', 'いいえ');
+                }else{
+                    //関数実行
+                    showConfirmDialog("再度検索をしようとしています。CRMから連携された反響情報を破棄して画面遷移をしてよろしいですか？ ", '', okFun, function(){
+                       $('#confirm_dialog').modal("hide");
+                    }, '', 'はい', 'いいえ');
+                }
+            }else{
+                if(!okFun){
+                    //画面遷移
+                    window.location.href = herfUrl;
+                }else{
+                    //関数実行
+                    okFun();
+                } 
+           }
+    }   
+    
+</script>
+<nav class="navbar navbar-default bb-header no-menu">
+    <div class="container-fluid">
+        <a class="navbar-brand" style="cursor:default;">
+            <img src="/dp/img/logo-brand.png" alt="Daiwa Living Management System" class="hidden-xs"><img src="/dp/img/sp-header-brand.png" alt="Daiwa Living Management System" class="visible-xs">        </a>
+        <a class="navbar-brand-sub" style="cursor:default;">
+            <img src="/dp/img/logo-type.png" alt="Daiwa Living Management System" class="hidden-xs">            <img src="/dp/img/logo-group.png" alt="Daiwa Living Management System" class="hidden-xs">        </a>		
+                    <p class="navbar-text pull-right" id="user_info">
+                <span>
+                    <!--ユーザーID-->
+                    735716001                    <!--担当者コード-->
+                    -0002｜
+                    <!--業者名-->
+                    株式会社　社宅．ｃｏｍ　                    <!--部署名-->
+                                        <!--ユーザー名-->
+                    村上　真史                </span>
+                <span>最終ログイン日:
+                    2026年05月27日                    <!--DPの場合-->
+                                            ｜
+                        <a _href="/dp/Logout" class="navbar-link common-logout" id="common-id" onclick="common_logout(this)">ログアウト</a>
+                                        <!--社員の場合-->
+                                    </span>
+            </p>
+                </div>
+</nav>
+            <div class="main">
+                <div class="bb-wrapper">
+                    <div class="bb-container">
+                        <div class="bb-page-content">
+                            <style>
+    .news{
+        display: inline-block;
+        font-weight: bold;
+        color:#f00;
+        width:28px;
+    }
+    .bb-datagrid tr td:nth-child(4){
+        text-align: left;
+    }
+    #topMessage{
+        color: red;
+    }
+</style>
+<form method="post" accept-charset="utf-8" id="formInformationImportantList" class="bb-form" action="/dp/navi/information"><div style="display:none;"><input type="hidden" name="_method" value="POST" style=""></div>	
+
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="clearfix">
+            <script>
+function common_from_check(formId,$this){
+      var ret=false;
+      var oForm=document.getElementById(formId);
+          var check = app.utils.formIsDirty(oForm);
+               if(check === true){
+                    showConfirmDialog('ページの移動をしようとしています。編集したデータの内容を破棄して画面遷移をしてよろしいですか？', '',function(){ window.location.href=$this.getAttribute('_href'); },function(ret){ ret=false;});
+                }else{
+                                            window.location.href=$this.getAttribute('_href');
+                                    }
+
+}
+</script>
+<style>
+    .breadcrumb-pointer{cursor: pointer;}
+</style>
+<ol class="breadcrumb bb-breadcrumb pull-left">
+                <li>
+                            ログイン                     </li>
+            <li class="active">
+                            お知らせ一覧                    </li>
+    </ol>        </div>
+        <div class="p10x20">
+            <h2 class="bb-page-title"><span class="bbicon-circle"></span> お知らせ一覧</h2>
+            <div id="informationInportantInfoList">
+                
+                                    <div class="row mb15">
+    <div class="col-xs-8">
+        <p class="form-control-static"><small><b>該当件数：<span class="cl-red">
+                        23</span> 件中 ｜ 1 - 10                </b></small></p>
+    </div>
+    <div class="col-xs-4">
+        <div class="pull-right" style="width:211px;">
+            <div class="input-group">
+                <span class="input-group-addon bb-addon" id="sizing-addon2">表示件数を変更</span>
+                <div>
+                    <select name="limit" class="form-control" id="ddlDisplayedResults"><option value="10" selected="selected">10件</option><option value="20">20件</option><option value="50">50件</option><option value="100">100件</option></select>                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+
+    <div class="pull-right col-sm-8 text-right">
+        <nav aria-label="Page navigation">
+            <ul class="pagination mb15 mt0 bb-pagination pr0" id="btnPager"><li class="active"><a href="/dp/navi/information?limit=10&amp;page=1&amp;sort=created&amp;direction=desc">1</a></li><li class=""><a href="/dp/navi/information?limit=10&amp;page=2&amp;sort=created&amp;direction=desc">2</a></li><li class=""><a href="/dp/navi/information?limit=10&amp;page=3&amp;sort=created&amp;direction=desc">3</a></li><li><a class="bb-next" href="/dp/navi/information?limit=10&amp;page=2&amp;sort=created&amp;direction=desc"><span aria-hidden="true">次へ</span></a></li></ul>        </nav>
+    </div>
+    <div class="pull-left col-sm-4 text-left">
+                            </div>
+</div>                    <table class="table table-bordered bb-datagrid mb15">
+                        <thead>
+                            <tr>
+                                <th style="width:90px;">
+                                    
+<a href="/dp/navi/information?limit=10&amp;page=1&amp;sort=new_flg&amp;direction=desc">新着 <span class=""></span></a>                                </th>
+                                <th style="width:80px;">
+                                    
+<a href="/dp/navi/information?limit=10&amp;page=1&amp;sort=syubetu_flg&amp;direction=desc">種別 <span class=""></span></a>                                </th>
+                                <th style="width:10%;">
+                                    
+<a href="/dp/navi/information?limit=10&amp;page=1&amp;sort=created&amp;direction=asc">発信日 <span class="bb-sort-desc bb-active"></span></a>                                </th>
+                                <th>
+                                    
+<a href="/dp/navi/information?limit=10&amp;page=1&amp;sort=title&amp;direction=desc">件名 <span class=""></span></a>                                </th>
+                                <th style="width:10%;">
+                                    
+<a href="/dp/navi/information?limit=10&amp;page=1&amp;sort=read_dt&amp;direction=desc">確認日 <span class=""></span></a>                                </th>
+                        </tr></thead>
+                        <tbody>
+                                                            <tr>
+                                    <td>
+                                         
+                                            <span class="news">new</span>
+                                                                                                                                <img src="/dp/img/mailclose.png" alt="">                                            </td>
+                                    <td>                                            <img src="/dp/img/information.png" alt="">                                            </td>
+                                    <td title="2026/05/25">2026/05/25</td>
+                                    <td>
+                                        <a href="/dp/navi/information/14887/2" class="btn btn-link" title="【※重要※】「電気配給サービス」のご提供に関する改めてのご案内">【※重要※】「電気配給サービス」のご提供に関する改めてのご案内</a>
+                                    </td>
+                                    <td title=""></td>
+                                </tr>
+                                                            <tr>
+                                    <td>
+                                                                                    <span class="news"></span>
+                                                                                                                                <img src="/dp/img/mailclose.png" alt="">                                            </td>
+                                    <td>                                            <img src="/dp/img/information.png" alt="">                                            </td>
+                                    <td title="2026/05/09">2026/05/09</td>
+                                    <td>
+                                        <a href="/dp/navi/information/14845/2" class="btn btn-link" title="案内用「オレンジカードキー」運用廃止の件">案内用「オレンジカードキー」運用廃止の件</a>
+                                    </td>
+                                    <td title=""></td>
+                                </tr>
+                                                            <tr>
+                                    <td>
+                                                                                    <span class="news"></span>
+                                                                                                                                <img src="/dp/img/mailopen.png" alt="">                                            </td>
+                                    <td>                                            <img src="/dp/img/important.png" alt="">                                            </td>
+                                    <td title="2026/04/30">2026/04/30</td>
+                                    <td>
+                                        <a href="/dp/navi/information/14828/2" class="btn btn-link" title="【お知らせ】 東日本D-ROOMセンター　東日本エリア 業務集約に伴う連絡先変更について">【お知らせ】 東日本D-ROOMセンター　東日本エリア 業務集約に伴う連絡先変更について</a>
+                                    </td>
+                                    <td title="2026/05/01">2026/05/01</td>
+                                </tr>
+                                                            <tr>
+                                    <td>
+                                                                                    <span class="news"></span>
+                                                                                                                                <img src="/dp/img/mailopen.png" alt="">                                            </td>
+                                    <td>                                            <img src="/dp/img/important.png" alt="">                                            </td>
+                                    <td title="2026/04/30">2026/04/30</td>
+                                    <td>
+                                        <a href="/dp/navi/information/14824/2" class="btn btn-link" title="【D-Partner事務局】GW休業のお知らせ">【D-Partner事務局】GW休業のお知らせ</a>
+                                    </td>
+                                    <td title="2026/04/30">2026/04/30</td>
+                                </tr>
+                                                            <tr>
+                                    <td>
+                                                                                    <span class="news"></span>
+                                                                                                                                <img src="/dp/img/mailopen.png" alt="">                                            </td>
+                                    <td>                                            <img src="/dp/img/important.png" alt="">                                            </td>
+                                    <td title="2026/04/15">2026/04/15</td>
+                                    <td>
+                                        <a href="/dp/navi/information/14771/2" class="btn btn-link" title="≪重要≫「在籍確認書類」について">≪重要≫「在籍確認書類」について</a>
+                                    </td>
+                                    <td title="2026/04/15">2026/04/15</td>
+                                </tr>
+                                                            <tr>
+                                    <td>
+                                                                                    <span class="news"></span>
+                                                                                                                                <img src="/dp/img/mailopen.png" alt="">                                            </td>
+                                    <td>                                            <img src="/dp/img

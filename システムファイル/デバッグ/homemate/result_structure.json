@@ -1,0 +1,778 @@
+{
+  "tables": [
+    {
+      "index": 0,
+      "id": "",
+      "class": "condlist kihon",
+      "rows": [
+        {
+          "index": 0,
+          "cells": [
+            {
+              "text": "賃料",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "下限なし\n1.5万\n2万\n2.5万\n3万\n3.5万\n4万\n4.5万\n5万\n6万\n7万\n8万\n9万\n10万\n11万\n12万",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "cells": [
+            {
+              "text": "間取り",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "1R\n      \n      \n        \n        1K\n      \n      \n        \n",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "cells": [
+            {
+              "text": "築年数",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "指定なし\n      \n      \n        \n        新築\n      \n      \n       ",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "cells": [
+            {
+              "text": "駅からの徒歩分",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "指定なし\n      \n      \n        \n        3分以内\n      \n      \n     ",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "id": "",
+      "class": "condlist kodawari popular",
+      "rows": [
+        {
+          "index": 0,
+          "cells": [
+            {
+              "text": "人気の設備",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "インターネット使用料無料\n      室内洗濯機置場\n      追焚き\n      オートロック\n      カメラ付",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "cells": [
+            {
+              "text": "人気の希望条件",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "バス・トイレ別\n      南向き\n      居室2階以上\n      ペット可（相談）\n      礼金ゼロ\n   ",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "id": "",
+      "class": "condlist kodawari",
+      "rows": [
+        {
+          "index": 0,
+          "cells": [
+            {
+              "text": "室内設備",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "フローリング\n      家具家電付\n      家具付\n      ロフト\n      クローゼット\n      サー",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "cells": [
+            {
+              "text": "キッチン",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "カウンターキッチン\n      アイランドキッチン\n      ペニンシュラキッチン\n      IHクッキングヒーター",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "cells": [
+            {
+              "text": "バス・トイレ",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "洗髪洗面化粧台\n      サニタリー",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "cells": [
+            {
+              "text": "建物設備・環境",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "2台目駐車場\n      駐輪場（バイク可）\n      トランクルーム\n      角部屋\n      高耐震・制震設",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "cells": [
+            {
+              "text": "専用機能",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "高齢者専用機能\n      ペット同居専用機能\n      ガーデニング専用機能\n      スマートリモコン\n    ",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "cells": [
+            {
+              "text": "セキュリティー",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "窓シャッター\n      スマートロック\n      カメラ付インターホン（スマートフォン対応）\n      スマートカ",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "cells": [
+            {
+              "text": "通信環境",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "ブロードバンド対応\n      BSアンテナ\n      CATV",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "cells": [
+            {
+              "text": "入居条件",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "女性専用\n      事務所使用可\n      友人同士可(相談)\n      楽器可（相談）\n      太陽光契約必",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "id": "ta_bukkenlist",
+      "class": "",
+      "rows": [
+        {
+          "index": 0,
+          "cells": [
+            {
+              "text": "外観",
+              "tag": "TH",
+              "class": "photo",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "所在地交通/徒歩分",
+              "tag": "TH",
+              "class": "access th_sort",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "",
+                  "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=2d&bc=3&pg=1"
+                }
+              ]
+            },
+            {
+              "text": "号室階建",
+              "tag": "TH",
+              "class": "floor",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "賃料共益費",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "",
+                  "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=1a&bc=3&pg=1"
+                }
+              ]
+            },
+            {
+              "text": "礼金",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "敷金敷引",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "駐車場",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "間取り面積",
+              "tag": "TH",
+              "class": "",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "",
+                  "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=3d&bc=3&pg=1"
+                },
+                {
+                  "text": "",
+                  "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=4d&bc=3&pg=1"
+                }
+              ]
+            },
+            {
+              "text": "完成年月入居可能日",
+              "tag": "TH",
+              "class": "date",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "",
+                  "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=5d&bc=3&pg=1"
+                },
+                {
+                  "text": "",
+                  "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=6a&bc=3&pg=1"
+                }
+              ]
+            },
+            {
+              "text": "紹介料",
+              "tag": "TH",
+              "class": "svc",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "",
+                  "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=7d&bc=3&pg=1"
+                }
+              ]
+            },
+            {
+              "text": "物件詳細",
+              "tag": "TH",
+              "class": "btn",
+              "colspan": 1,
+              "links": []
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "cells": [
+            {
+              "text": "",
+              "tag": "TD",
+              "class": "td_top",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "",
+                  "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=7014316101002&id=CF5B41E0473A384B66A8C602B050ABF9387D30"
+                }
+              ]
+            },
+            {
+              "text": "サウスガーデンレジデンス大阪市北区南森町１丁目４番３１号OsakaMetro堺筋線  南森町駅まで徒歩4分(320m)",
+              "tag": "TD",
+              "class": "td_add td_top",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "大阪市北区南森町１丁目４番３１号OsakaMetro堺筋線 ",
+                  "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=7014316101002&id=CF5B41E0473A384B66A8C602B050ABF9387D30"
+                }
+              ]
+            },
+            {
+              "text": "100210/10階角部屋",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.8万円0.6万円",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.8万円",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.8万円無し",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "無し",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "1LDK35.89m²",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "2021/052026/07/30",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.8万円\n\n\n紹介料1ヵ月",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "詳細を見る",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "詳細を見る",
+                  "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=7014316101002&id=CF5B41E0473A384B66A8C602B050ABF9387D30"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "cells": [
+            {
+              "text": "3023/10階角部屋",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.0万円0.6万円",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.0万円",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.0万円無し",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "無し",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "1LDK35.89m²",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "2021/052026/07/20",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.0万円\n\n\n紹介料1ヵ月",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "詳細を見る",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "詳細を見る",
+                  "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=701431610302&id=CF5B41E0473A384B66A8C602B050ABF9387D30D"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "cells": [
+            {
+              "text": "9039/10階角部屋",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.6万円0.6万円",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.6万円",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.6万円無し",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "無し",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "1LDK35.89m²",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "2021/052026/07/20",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "12.6万円\n\n\n紹介料1ヵ月",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": []
+            },
+            {
+              "text": "詳細を見る",
+              "tag": "TD",
+              "class": "",
+              "colspan": 1,
+              "links": [
+                {
+                  "text": "詳細を見る",
+                  "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=701431610903&id=CF5B41E0473A384B66A8C602B050ABF9387D30D"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "bukken_els": [
+    {
+      "tag": "TABLE",
+      "class": "condlist kihon",
+      "text": "賃料\n  \n    \n\n下限なし\n1.5万\n2万\n2.5万\n3万\n3.5万\n4万\n4.5万\n5万\n6万\n7万\n8万\n9万\n10万\n11万\n12万\n13万\n14万\n15万\n20万\n25万\n30万\n35万"
+    },
+    {
+      "tag": "TABLE",
+      "class": "condlist kodawari popular",
+      "text": "人気の設備\n  \n    \n      インターネット使用料無料\n      室内洗濯機置場\n      追焚き\n      オートロック\n      カメラ付インターホン\n      洗面化粧台\n "
+    },
+    {
+      "tag": "TABLE",
+      "class": "condlist kodawari",
+      "text": "室内設備\n  \n    \n      フローリング\n      家具家電付\n      家具付\n      ロフト\n      クローゼット\n      サービスルーム（納戸）\n      シューズク"
+    },
+    {
+      "tag": "P",
+      "class": "room_list_print_btn",
+      "text": "物件一覧を印刷する"
+    },
+    {
+      "tag": "DIV",
+      "class": "hyouji_box list_bottom",
+      "text": ""
+    },
+    {
+      "tag": "LI",
+      "class": "list_last",
+      "text": "ソーシャルメディアポリシー"
+    }
+  ],
+  "links": [
+    {
+      "text": "ホームメイトRoomSearch　仲介依頼物件システム（ルームサーチ）",
+      "href": "https://www.homemate.co.jp/hmroom/srch.asp?prf=27&stjiscd=27127&kt=01&jiscd=27127#"
+    },
+    {
+      "text": "賃貸のホームメイト［全国の賃貸マンション、賃貸アパートを検索]",
+      "href": "https://www.homemate.co.jp/"
+    },
+    {
+      "text": "ログアウト",
+      "href": "https://www.homemate.co.jp/hmroom/logout.asp"
+    },
+    {
+      "text": "TOP",
+      "href": "https://www.homemate.co.jp/hmroom/top.asp"
+    },
+    {
+      "text": "事業用物件の検索はこちら",
+      "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=02&prf=27&jiscd=27127"
+    },
+    {
+      "text": "物件一覧を印刷する",
+      "href": "http://pdf.homemate.co.jp/hmroom/pdfSrch.asp?id=CF5B41E0473A384B66A8C602B050ABF9387D30D3&tnn=&bn=&so=2a&kt=01&jiscd=27127"
+    },
+    {
+      "text": "",
+      "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=2d&bc=3&pg=1"
+    },
+    {
+      "text": "",
+      "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=1a&bc=3&pg=1"
+    },
+    {
+      "text": "",
+      "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=3d&bc=3&pg=1"
+    },
+    {
+      "text": "",
+      "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=4d&bc=3&pg=1"
+    },
+    {
+      "text": "",
+      "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=5d&bc=3&pg=1"
+    },
+    {
+      "text": "",
+      "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=6a&bc=3&pg=1"
+    },
+    {
+      "text": "",
+      "href": "https://www.homemate.co.jp/hmroom/srch.asp?kt=01&jiscd=27127&so=7d&bc=3&pg=1"
+    },
+    {
+      "text": "",
+      "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=7014316101002&id=CF5B41E0473A384B66A8C602B050ABF9387D30D3"
+    },
+    {
+      "text": "大阪市北区南森町１丁目４番３１号OsakaMetro堺筋線  南森町駅まで徒歩4",
+      "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=7014316101002&id=CF5B41E0473A384B66A8C602B050ABF9387D30D3"
+    },
+    {
+      "text": "詳細を見る",
+      "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=7014316101002&id=CF5B41E0473A384B66A8C602B050ABF9387D30D3"
+    },
+    {
+      "text": "詳細を見る",
+      "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=701431610302&id=CF5B41E0473A384B66A8C602B050ABF9387D30D3"
+    },
+    {
+      "text": "詳細を見る",
+      "href": "https://www.homemate.co.jp/hmroom/dtl.asp?bn=701431610903&id=CF5B41E0473A384B66A8C602B050ABF9387D30D3"
+    },
+    {
+      "text": "会社概要",
+      "href": "https://www.token.co.jp/corporate/outline/"
+    },
+    {
+      "text": "お問合せ",
+      "href": "https://www.homemate.co.jp/hmroom/inquiry/input.asp?id=hmroom-info"
+    }
+  ],
+  "images": [
+    {
+      "src": "https://pic1.homemate.co.jp/ice/image2/0001/1/692/589/G41706864806244.jpg",
+      "alt": "外観写真",
+      "w": 1024,
+      "h": 768
+    }
+  ]
+}

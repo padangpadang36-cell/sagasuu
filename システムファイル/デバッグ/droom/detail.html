@@ -1,0 +1,621 @@
+<!DOCTYPE html><html><head>
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script type="text/javascript" async="" src="https://www.googletagmanager.com/gtag/js?id=G-L0N9BTPJRE&amp;cx=c&amp;gtm=4e65l0"></script><script type="text/javascript" async="" src="https://www.google-analytics.com/analytics.js"></script><script type="text/javascript" async="" src="https://www.googletagmanager.com/gtag/js?id=G-WQKLM0HB7G&amp;cx=c&amp;gtm=4e65l0"></script><script async="" src="https://www.googletagmanager.com/gtm.js?id=GTM-PSCFVT5"></script><script async="" src="https://www.googletagmanager.com/gtag/js?id=UA-129304110-1"></script>
+        <script>
+              (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0], j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-PSCFVT5');
+         </script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'UA-129304110-1');
+        </script>
+        <meta charset="utf-8">        <link href="/dp/favicon.ico" type="image/x-icon" rel="icon"><link href="/dp/favicon.ico" type="image/x-icon" rel="shortcut icon">        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>新D-rooｍNAVIシステム</title>
+        <meta name="description" content="">
+        <meta name="author" content="">
+        
+                <!-- Bootstrap Core CSS -->
+        <link rel="stylesheet" href="/dp/css/bootstrap.min.css?v870495062">        <!-- Custom CSS -->
+        <link rel="stylesheet" href="/dp/css/base_template/simple-sidebar.css">        <link rel="stylesheet" href="/dp/fonts/buysell/style.css">        <link rel="stylesheet" href="/dp/css/base_template/bb.css?v1474665415">        <link rel="stylesheet" href="/dp/css/base_template/bb-btn.css?v1138752497">        <link rel="stylesheet" href="/dp/css/app.css">        <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+        <!--[if IE 9]>
+        <link rel="stylesheet" href="/dp/css/base_template/ie9.css"/>       <![endif]-->
+        <!--[if lt IE 9]>
+        <link rel="stylesheet" href="/dp/css/base_template/ie8.css"/>        <script src="/dp/js/base-js/html5shiv.js?v1087542759"></script>        <script src="/dp/js/base-js/respond.min.js?v789511779"></script>        <![endif]-->
+        <!-- Custom CSS -->
+        <!-- Main Script -->
+        <script src="/dp/js/jquery.min.js?v784202981"></script>        <script src="/dp/js/jquery.cookie.js?v1352193159"></script>        <script src="/dp/js/jquery.fileDownload.js?v1559776642"></script>        <script src="/dp/js/jquery.validate.min.js?v2051972333"></script>        <script src="/dp/js/katakanaUtils.js?v1100678304"></script>        <script src="/dp/js/jquery.validate.customize.js?v1513111561"></script>        <script src="/dp/js/utils.js?v282913496"></script>        <script src="/dp/js/modal.js?v168414542"></script>        <script src="/dp/js/app.js?v1076749353"></script>
+        <!-- Custom JS Lib -->
+                <script type="text/javascript">
+            var app = app || {};
+            app.utils = new app._utils({
+                // Common title and message
+                "ignoreTownName": ["\u4ee5\u4e0b\u306b\u63b2\u8f09\u304c\u306a\u3044\u5834\u5408"]            });
+            app.modal = new app._modal({
+                // Common title and message
+            });
+        </script>
+    </head>
+    <body class="unie8" style="min-width: 1054px;" data-behave_send_flg_23a6dc4e2941e7b0a87ee4fd50441ec6="1">
+        <noscript>
+              <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PSCFVT5" height="0" width="0" style="display:none;visibility:hidden"></iframe>
+      </noscript>
+        <div id="container">
+            <style>
+    @media screen and (max-width:1100px){
+        .container-fluid .navbar-brand{
+            margin-left: -45px;
+        }
+    }
+    .navbar-brand-sub img{
+        padding:39px 0
+    }
+    .navbar-brand-sub{
+        color:#fff !important;
+    }
+    .common-logout{cursor: pointer;}
+</style>
+<script>
+    var baseUrl = "https://anavi.daiwaliving.co.jp/dp/";
+    var chintaimenubackurl = "https://anavi.daiwaliving.co.jp/lv/menu";
+    function common_logout($this) {
+        var ret = false;
+        if ($('.common-logout').hasClass("logout-check") && !$('.common-logout').hasClass("jump")) {
+            var formCount = document.forms.length;
+            for (var i = 0; i < formCount; i++) {
+                var formId = document.forms[i].id;
+
+                var oForm = document.getElementById(formId);
+                var check = app.utils.formIsDirty(oForm);
+                if (check === true) {
+                    ret = true;
+                }
+            }
+            if (ret) {
+                showConfirmDialog('ページの移動をしようとしています。編集したデータの内容を破棄して画面遷移をしてよろしいですか？', '', function () {
+                    window.location.href = $this.getAttribute('_href');
+                });
+            } else {
+                window.location.href = $this.getAttribute('_href');
+            }
+        } else {
+            if (!$('.common-logout').hasClass("jump"))
+                window.location.href = $this.getAttribute('_href');
+        }
+    }
+    function chintaimenuback() {
+        if ($('.breadcrumb-pointer').length > 0) {
+            if ($('.breadcrumb-pointer')[0].attributes['onclick'] != null && $('.breadcrumb-pointer')[0].attributes['onclick'] != undefined) {
+                var $str = $('.breadcrumb-pointer')[0].attributes['onclick'].nodeValue;
+                var oForm = document.getElementById($str.split("'")[1]);
+                var check = app.utils.formIsDirty(oForm);
+                if (check === true) {
+                    showConfirmDialog('ページの移動をしようとしています。編集したデータの内容を破棄して画面遷移をしてよろしいですか？', '', function () {
+                        window.location.href = chintaimenubackurl;
+                    }, function (ret) {
+                        ret = false;
+                    });
+                } else {
+                    window.location.href = chintaimenubackurl;
+                }
+            } else {
+                window.location.href = chintaimenubackurl;
+            }
+        } else {
+            window.location.href = chintaimenubackurl;
+        }
+    }
+        
+    //CRMから連携された物件を破棄すること確認
+    function clearCrmRoomIdMsg(herfUrl,okFun,request_cd,msg){
+            if(request_cd){
+                if(herfUrl){
+                    if(!msg){
+                        msg = "ページの移動をしようとしています。CRMから連携された反響情報を破棄して画面遷移をしてよろしいですか？ ";
+                    }
+                    showConfirmDialog(msg, '', function(){
+                    if(!okFun){
+                        //画面遷移
+                        window.location.href = herfUrl;
+                    }else{
+                        //関数実行
+                        okFun();
+                    }
+                   }, function(){
+                    $('#confirm_dialog').modal("hide");
+                   }, '', 'はい', 'いいえ');
+                }else{
+                    //関数実行
+                    showConfirmDialog("再度検索をしようとしています。CRMから連携された反響情報を破棄して画面遷移をしてよろしいですか？ ", '', okFun, function(){
+                       $('#confirm_dialog').modal("hide");
+                    }, '', 'はい', 'いいえ');
+                }
+            }else{
+                if(!okFun){
+                    //画面遷移
+                    window.location.href = herfUrl;
+                }else{
+                    //関数実行
+                    okFun();
+                } 
+           }
+    }   
+    
+</script>
+<nav class="navbar navbar-default bb-header no-menu">
+    <div class="container-fluid">
+        <a class="navbar-brand" style="cursor:default;">
+            <img src="/dp/img/logo-brand.png" alt="Daiwa Living Management System" class="hidden-xs"><img src="/dp/img/sp-header-brand.png" alt="Daiwa Living Management System" class="visible-xs">        </a>
+        <a class="navbar-brand-sub" style="cursor:default;">
+            <img src="/dp/img/logo-type.png" alt="Daiwa Living Management System" class="hidden-xs">            <img src="/dp/img/logo-group.png" alt="Daiwa Living Management System" class="hidden-xs">        </a>		
+                    <p class="navbar-text pull-right" id="user_info">
+                <span>
+                    <!--ユーザーID-->
+                    735716001                    <!--担当者コード-->
+                    -0002｜
+                    <!--業者名-->
+                    株式会社　社宅．ｃｏｍ　                    <!--部署名-->
+                                        <!--ユーザー名-->
+                    村上　真史                </span>
+                <span>最終ログイン日:
+                    2026年05月27日                    <!--DPの場合-->
+                                            ｜
+                        <a _href="/dp/Logout" class="navbar-link common-logout" id="common-id" onclick="common_logout(this)">ログアウト</a>
+                                        <!--社員の場合-->
+                                    </span>
+            </p>
+                </div>
+</nav>
+            <div class="main">
+                <div class="bb-wrapper">
+                    <div class="bb-container">
+                        <div class="bb-page-content">
+                            <div class="modal bb-modal" id="alert_dialog" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-header-custom" default-title="">
+                <h4 class="modal-title"></h4>
+                <button type="button" onclick="usedOkFunction();" class="close" data-dismiss="modal" aria-label="Close"><span class="bbicon-close"></span></button>
+            </div>
+            <div class="modal-body modal-body-custom" style="max-height: 740px; overflow-y: auto;">
+                <p></p>
+            </div>
+            <div class="modal-footer modal-footer-custom">
+                <button type="button" class="btn btn-raised btn-info" onclick="usedOkFunction();">戻る</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal -->
+<div class="modal bb-modal" id="warn_dialog" data-backdrop="static" data-keyboard="false">
+    <div class="modal-dialog warn-border warn-dialog">
+        <div class="modal-content">
+<!--            <div class="modal-header modal-header-custom" default-title="">
+                <h4 class="modal-title"></h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span class="bbicon-close"></span></button>
+            </div>-->
+            <div class="modal-body modal-body-custom" style="max-height: 740px; overflow-y: auto;">
+                <p></p>
+            </div>
+            <div class="modal-footer modal-footer-custom">
+                <button id="btnOk" type="button" onclick="usedOkFunction();" default-text="はい" class="btn btn-raised btn-info">はい</button>
+                <button id="btnCancel" type="button" class="btn btn-raised btn-info" default-text="いいえ" onclick="usedCancelFunction();" data-dismiss="modal">いいえ</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+/*
+ * Show Confirmation dialog
+ * @param {string} message
+ * @param {string} title
+ * @param {function} okFunction
+ * @param [function]function cancelFunction
+ * @param [boolen] isHtml Message will render as HTML
+ * if setMethod = html => we will use .html(message) to append message.
+ * if setMethod = text => we will use .text(message) to append message.
+ * By default: .html(message);
+ * Note:
+ * 1) .html(message) ; => support HTML tags (<br/>, <p>...), but you need ensure that your message
+ * do not content special characters. If the message contents them, it may break the GUI.
+ * 2) .text(message) ; => Can show specical characters on dialog.
+ * @returns {showAlert}
+ * */
+function showWarnDialog(message, title, okFunction, cancelFunction, isHtml, okBtnText, cancelBtnText, hideFlg,fixedHideFlg) {
+    okFunction = typeof okFunction !== 'undefined' ? okFunction : null;
+    cancelFunction = typeof cancelFunction !== 'undefined' ? cancelFunction : null;
+    usedOkFunction = function () {
+        okFunction();
+        if(!hideFlg){
+           $('#warn_dialog').modal('hide');
+        }
+        if(!fixedHideFlg){
+            if($(".bb-fixed-bottom").length>0){
+                $(".bb-fixed-bottom").removeClass("hidden");
+            } 
+        }else{
+            $('.unie8').addClass('modal-open');
+        }
+    };
+    if (cancelFunction === null) {
+        usedCancelFunction = function () {
+            //$('#warn_dialog').modal('hide');
+            if($(".bb-fixed-bottom").length>0){
+                $(".bb-fixed-bottom").removeClass("hidden");
+            }
+        };
+    } else {
+        usedCancelFunction = function () {
+            cancelFunction();
+            //$('#warn_dialog').modal('hide');
+            if($(".bb-fixed-bottom").length>0){
+                $(".bb-fixed-bottom").removeClass("hidden");
+            }
+        };
+    }
+    if (isHtml === true) {
+        $('#warn_dialog .modal-body p').html(message);
+    } else {
+        $('#warn_dialog .modal-body p').text(message);
+    }
+    
+    if (typeof okBtnText !== 'undefined' && okBtnText!==null && okBtnText.length > 0) {
+        $("#btnOk", "#warn_dialog").text(okBtnText);
+    } else {
+        var text = $("#btnOk", "#warn_dialog").attr("default-text");
+        $("#btnOk", "#warn_dialog").text(text);
+    }
+    if (typeof cancelBtnText !== 'undefined' && cancelBtnText !== null && cancelBtnText.length > 0) {
+        $("#btnCancel", "#warn_dialog").text(cancelBtnText);
+    } else {
+        var text = $("#btnCancel", "#warn_dialog").attr("default-text");
+        $("#btnCancel", "#warn_dialog").text(text);
+    }
+
+    $('#warn_dialog .modal-title').text(title);
+    $('#warn_dialog').modal('show');
+    if($(".bb-fixed-bottom").length>0){
+        $(".bb-fixed-bottom").addClass("hidden");
+    }
+    $('#btnOk').focus();
+}
+$('.warn-dialog').keydown(function(e) {
+    if(e.which == 9) { 
+        e.preventDefault(); 
+        var isFocus=$('#btnOk').is(":focus");
+        if(isFocus == true){
+            $('#btnCancel').focus();
+        }else{
+            $('#btnOk').focus();
+        }
+    }
+}); 
+</script><style>
+    .checkbox-group .checkbox-inline{
+        margin:15px 0;
+        min-width:110px;
+    }
+    .checkbox-group-width .checkbox-inline{
+        margin:15px 0;
+        width:250px;
+        word-break:break-all;
+    }
+    .sp_play_btn img{
+        height:50px;
+        margin-right:10px;
+        margin-top:5px;
+        margin-bottom:5px;
+    }
+    .bb-datagrid-left tr td{
+        text-align:left;
+    }
+    .bb-datagrid-left .button-group{
+        width:16%
+    }
+    .bb-datagrid-left .button-group .btn{
+        width:100px;
+    }
+    .bb-datagrid-left .text-center{
+        text-align: center;
+    }
+    .table-back-color td{
+        background-color: #d3d3d5;
+    }
+    .logo_box{
+        border-left:1px solid #ddd;
+        border-right:1px solid #ddd;
+        padding:10px;
+    }
+    .button_yellow{
+        text-align: center;
+        color: red;
+        background: lemonchiffon;
+        border: solid 1px red;
+        padding:2px 4px;
+        width:58px;
+    }
+    .button_gray{
+        text-align: center;
+        color:#336633;
+        background: #ccc;
+        border: solid 1px #336633;
+        padding:2px 4px;
+        width:38px;
+    }
+    .button_red{
+        text-align: center;
+        color:#fff;
+        background: #f00;
+        padding:2px 6px;
+        width:38px;
+    }
+    .sp_play_btn{
+        padding:0 12px;
+    }
+    @media (max-width: 1486px){
+        .table-responsive{
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+        }
+
+    }
+    @media (max-width: 1379px){
+        .checkbox-group-width .checkbox-inline{
+            min-width:160px;
+        }
+    }
+    @media (max-width: 1184px){
+        .col-sm-3 {
+            width: 50%;
+        }
+    }
+    .table-sign{
+        width:100%;
+    }
+    .table-sign tbody tr td{
+        width:68px;
+        text-align: center;
+    }
+    .sp_btn{
+        padding:5px 0px;
+        font-size: 13px;
+        display: block;
+        line-height:20px;
+    }
+    .td-height{
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+    }
+
+    td.changed {
+        background-color: yellow;
+    }
+    
+    td.left-border {
+        border-left: 1px solid #999;
+    }
+
+    .bb-form-group-height .checkbox-inline{
+        height: 29px;
+    }
+
+    .p512{
+        padding-bottom: 12px!important;
+        line-height: 20px !important;
+    }
+    .bb-fixed-bottom-roomlist {
+    background: url(https://anavi.daiwaliving.co.jp/dp/img/bg-fixed-bottom.png);
+    padding: 15px 35px;
+    position: fixed;
+    top: 0;
+    right: 0;
+    z-index: 9000;
+}
+    .sp_btn_kariStatus{
+        padding:0px 0px 0px 0px;
+        line-height: 20px;
+        font-size: 13px;
+        margin: 0;
+        display: block;
+    }
+
+</style>
+<form method="post" accept-charset="utf-8" id="frmRoomList" class="bb-form" action="/dp/navi/room/RoomList/room"><div style="display:none;"><input type="hidden" name="_method" value="POST" style=""></div><div class="container-fluid">
+    <div class="clearfix">
+        <script>
+function common_from_check(formId,$this){
+      var ret=false;
+      var oForm=document.getElementById(formId);
+          var check = app.utils.formIsDirty(oForm);
+               if(check === true){
+                    showConfirmDialog('ページの移動をしようとしています。編集したデータの内容を破棄して画面遷移をしてよろしいですか？', '',function(){ window.location.href=$this.getAttribute('_href'); },function(ret){ ret=false;});
+                }else{
+                                            window.location.href=$this.getAttribute('_href');
+                                    }
+
+}
+</script>
+<style>
+    .breadcrumb-pointer{cursor: pointer;}
+</style>
+<ol class="breadcrumb bb-breadcrumb pull-left">
+                <li>
+                                
+                        <a class="breadcrumb-pointer jump" href="/dp/navi">メニュー </a>
+                                                        </li>
+            <li class="active">
+                            物件リスト（住居用）                    </li>
+    </ol>    </div>
+    <div class="text-right plr20 mb20">
+        <a href="/dp/navi" onclick=" " class="btn btn-default bb-prev">メニューへ戻る</a>
+    </div>
+</div> 
+<ul class="nav nav-tabs bb-tabs plr35">
+    <li class="active"><a href="#">住居用</a></li>
+    <li>
+        <a href="/dp/navi/room/RoomListTenant/init" onclick=" ">テナント用</a>
+    </li>
+</ul>
+<div class="container-fluid bg-lgray plr35">
+    <div style="padding-top:20px;">
+        <div id="error_message_division" class="alert alert-danger bb-error-message-division hidden" role="alert"></div>
+        <div class="row">
+            <div class="col-xs-8 col-xs-push-4">
+                <div class="form-group bb-right">
+                    <div class="form-inline text-right">
+                        <button type="button" id="btn-city" class="btn btn-primary bb-btn-round btn-lg">市町村選択</button>
+                        <button type="button" id="btn-station" class="btn btn-primary bb-btn-round btn-lg">駅選択</button>
+                        <button type="button" id="btn-map" class="btn btn-primary bb-btn-round btn-lg">地図から検索</button>
+                        <button type="button" id="btn-walkbus" class="btn btn-primary bb-btn-round btn-lg">徒歩・バス検索</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-xs-4 col-xs-pull-8">
+                <h2 class="bb-page-title"><span class="bbicon-circle"></span> 検索条件</h2>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-12 col-sm-6 form-control-text-xs">
+                <div class="form-group bb-form-group">
+                    <label>選択条件</label>
+                    <div>
+                        <p class="form-control-static td-width" id="p_condition_parameter_string" title="なし" style="width:408px">なし</p>     
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-6">
+                <div class="form-group bb-form-group">
+                    <label>支店</label>
+                    <div>
+                        <select name="sitenCd" class="form-control" style="min-width:100px;" id="ddlSiten"><option value="" selected="selected"></option><option value="02">02:本営業</option><option value="03">03:ｱｾｯﾄ</option><option value="10">10:北日本</option><option value="20">20:北関東</option><option value="30">30:東京</option><option value="50">50:東関東</option><option value="60">60:中部</option><option value="70">70:関西</option><option value="80">80:中四国</option><option value="90">90:九州</option></select>                    </div>
+                </div>
+            </div>
+            <div class="col-xs-6">
+                <div class="form-group bb-form-group">
+                    <label>営業所</label>
+                    <div>
+                        <select name="eigyosyoCd" class="form-control" style="min-width:100px;" id="ddlEigyosyo" disabled="disabled"></select>                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-6">
+                <div class="form-group bb-form-group">
+                    <label>エリア</label>
+                    <div>
+                        <button type="button" id="btn-area-select" class="btn btn-primary bb-btn-round" disabled="ture">選択</button>
+                        <label id="area_nm" style="max-width:362px!important;min-width:100px;text-align:left;font-weight:normal;font-size:13px;margin-bottom:0px!important;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></label>
+                        <input type="hidden" id="areaCd" name="areaCd" value="" style="">
+                    </div>
+                </div>
+            </div>
+            <div class="col-xs-6">
+                <div class="form-group bb-form-group">
+                    <label>担当者</label>
+                    <div>
+                        <select name="tantosya_cd" class="form-control" style="min-width:100px;disabled" id="ddlTantosyaCd" disabled="disabled"></select>                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-6">
+                <div class="form-group bb-form-group">
+                    <label>物件名（カナ）</label>
+                    <div>
+                        <input type="text" name="bukkenNmKana" class="form-control full-half-kana" maxlength="30" value="" style="">                    </div>
+                </div>
+            </div>
+            <div class="col-xs-6">
+                <div class="form-group bb-form-group">
+                    <label>問い合わせコード</label>
+                    <div>
+                        <input type="text" name="room_id" class="form-control" maxlength="30" value="" style="">                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mb20">
+            <div class="col-xs-12 col-sm-6">
+                <div class="form-group bb-form-group">
+                    <label>住所</label>
+                    <div>
+                        <input type="text" name="address" class="form-control room_address" maxlength="300" value="" style="">                    </div>
+                </div>
+            </div>
+            <div class="col-xs-12 col-sm-6">
+                <div class="form-group bb-form-group bb-input-group">
+                    <label>家賃</label>
+                    <div>
+                        <div class="col-xs-4 pad0" id="rentFromDiv">
+                            <div class="input-group">
+                                <input type="text" name="rentFrom" id="ddlRentFrom" class="form-control text-right focusout" value="" style="">                                <span class="input-group-addon bb-addon" style="font-size:13px">万円～</span>
+                            </div>
+                        </div>
+                        <div class="col-xs-4 pad0">
+                            <div class="input-group">
+                                <input type="text" name="rentTo" id="ddlRentTo" class="form-control text-right focusout" value="" style="">                                <span class="input-group-addon bb-addon"><div style="width:42px;text-align: left;font-size:13px">万円</div></span>
+                            </div>
+                        </div>
+                        <div class="col-xs-4 pad0">
+                            <div class="checkbox" style="padding:15px 10px">
+                                <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" name="rentType" value="1" style="">
+                                    <span class="bb-ui"></span> 共益費含む
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <a data-toggle="collapse" href="#room-list-collapse1" aria-controls="room-list-collapse1" class="no-u" id="room-list-collapse1-btn" aria-expanded="true">
+            <h2 class="bb-title mb20"><span class="bbicon-circle"></span> 詳細条件<span id="condition-detail" style=" color: red;font-size: 13px;vertical-align:middle">　詳細条件の設定はこちらをクリックしてください</span><span class="bbicon-arr_t pull-right"></span></h2>
+        </a>
+
+        <div class="collapse" id="room-list-collapse1">
+
+            <div class="row">
+                <div class="col-xs-12">
+                    <div class="form-group bb-form-group">
+                        <label>間取</label>
+                        <div>
+                            <div class="checkbox checkbox-group" style="padding:0 12px">
+                                                                <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_1R" name="layout[]" value="1R" style="">
+                                    <span class="bb-ui"></span> 1R                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_1K" name="layout[]" value="1K" style="">
+                                    <span class="bb-ui"></span> 1K                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_1DK" name="layout[]" value="1DK" style="">
+                                    <span class="bb-ui"></span> 1DK                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_1LDK" name="layout[]" value="1LDK" style="">
+                                    <span class="bb-ui"></span> 1LDK                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_2K" name="layout[]" value="2K" style="">
+                                    <span class="bb-ui"></span> 2K                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_2DK" name="layout[]" value="2DK" style="">
+                                    <span class="bb-ui"></span> 2DK                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_2LDK" name="layout[]" value="2LDK" style="">
+                                    <span class="bb-ui"></span> 2LDK                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_3K" name="layout[]" value="3K" style="">
+                                    <span class="bb-ui"></span> 3K                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_3DK" name="layout[]" value="3DK" style="">
+                                    <span class="bb-ui"></span> 3DK                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_3LDK" name="layout[]" value="3LDK" style="">
+                                    <span class="bb-ui"></span> 3LDK                                </label>
+                                                                        <label class="checkbox-inline bb-checkbox">
+                                    <input type="checkbox" id="chk_layout_4K" name="layout[]" value="4K" style="">
+                                    <span class="bb-ui"></sp

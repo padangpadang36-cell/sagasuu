@@ -1,0 +1,578 @@
+<!DOCTYPE html><html><head>
+        <!-- Global site tag (gtag.js) - Google Analytics -->
+        <script type="text/javascript" async="" src="https://www.googletagmanager.com/gtag/js?id=G-L0N9BTPJRE&amp;cx=c&amp;gtm=4e65l0"></script><script type="text/javascript" async="" src="https://www.google-analytics.com/analytics.js"></script><script type="text/javascript" async="" src="https://www.googletagmanager.com/gtag/js?id=G-WQKLM0HB7G&amp;cx=c&amp;gtm=4e65l0"></script><script async="" src="https://www.googletagmanager.com/gtm.js?id=GTM-PSCFVT5"></script><script async="" src="https://www.googletagmanager.com/gtag/js?id=UA-129304110-1"></script>
+        <script>
+              (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0], j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-PSCFVT5');
+         </script>
+        <script>
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'UA-129304110-1');
+        </script>
+        <meta charset="utf-8">        <link href="/dp/favicon.ico" type="image/x-icon" rel="icon"><link href="/dp/favicon.ico" type="image/x-icon" rel="shortcut icon">        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>新D-rooｍNAVIシステム</title>
+        <meta name="description" content="">
+        <meta name="author" content="">
+        
+                <!-- Bootstrap Core CSS -->
+        <link rel="stylesheet" href="/dp/css/bootstrap.min.css?v2120280951">        <!-- Custom CSS -->
+        <link rel="stylesheet" href="/dp/css/base_template/simple-sidebar.css">        <link rel="stylesheet" href="/dp/fonts/buysell/style.css">        <link rel="stylesheet" href="/dp/css/base_template/bb.css?v1261682103">        <link rel="stylesheet" href="/dp/css/base_template/bb-btn.css?v1854783057">        <link rel="stylesheet" href="/dp/css/app.css">        <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+        <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+        <!--[if IE 9]>
+        <link rel="stylesheet" href="/dp/css/base_template/ie9.css"/>       <![endif]-->
+        <!--[if lt IE 9]>
+        <link rel="stylesheet" href="/dp/css/base_template/ie8.css"/>        <script src="/dp/js/base-js/html5shiv.js?v146052329"></script>        <script src="/dp/js/base-js/respond.min.js?v112358836"></script>        <![endif]-->
+        <!-- Custom CSS -->
+        <!-- Main Script -->
+        <script src="/dp/js/jquery.min.js?v1924855939"></script>        <script src="/dp/js/jquery.cookie.js?v1465343929"></script>        <script src="/dp/js/jquery.fileDownload.js?v924487363"></script>        <script src="/dp/js/jquery.validate.min.js?v968710578"></script>        <script src="/dp/js/katakanaUtils.js?v543523029"></script>        <script src="/dp/js/jquery.validate.customize.js?v520794873"></script>        <script src="/dp/js/utils.js?v1339873958"></script>        <script src="/dp/js/modal.js?v1218696263"></script>        <script src="/dp/js/app.js?v1771551017"></script>
+        <!-- Custom JS Lib -->
+                <script type="text/javascript">
+            var app = app || {};
+            app.utils = new app._utils({
+                // Common title and message
+                "ignoreTownName": ["\u4ee5\u4e0b\u306b\u63b2\u8f09\u304c\u306a\u3044\u5834\u5408"]            });
+            app.modal = new app._modal({
+                // Common title and message
+            });
+        </script>
+    </head>
+    <body class="unie8" style="min-width: 1054px;" data-behave_send_flg_df0518217fdc62fee8632d8a512332d4="1">
+        <noscript>
+              <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PSCFVT5" height="0" width="0" style="display:none;visibility:hidden"></iframe>
+      </noscript>
+        <div id="container">
+            <style>
+    @media screen and (max-width:1100px){
+        .container-fluid .navbar-brand{
+            margin-left: -45px;
+        }
+    }
+    .navbar-brand-sub img{
+        padding:39px 0
+    }
+    .navbar-brand-sub{
+        color:#fff !important;
+    }
+    .common-logout{cursor: pointer;}
+</style>
+<script>
+    var baseUrl = "https://anavi.daiwaliving.co.jp/dp/";
+    var chintaimenubackurl = "https://anavi.daiwaliving.co.jp/lv/menu";
+    function common_logout($this) {
+        var ret = false;
+        if ($('.common-logout').hasClass("logout-check") && !$('.common-logout').hasClass("jump")) {
+            var formCount = document.forms.length;
+            for (var i = 0; i < formCount; i++) {
+                var formId = document.forms[i].id;
+
+                var oForm = document.getElementById(formId);
+                var check = app.utils.formIsDirty(oForm);
+                if (check === true) {
+                    ret = true;
+                }
+            }
+            if (ret) {
+                showConfirmDialog('ページの移動をしようとしています。編集したデータの内容を破棄して画面遷移をしてよろしいですか？', '', function () {
+                    window.location.href = $this.getAttribute('_href');
+                });
+            } else {
+                window.location.href = $this.getAttribute('_href');
+            }
+        } else {
+            if (!$('.common-logout').hasClass("jump"))
+                window.location.href = $this.getAttribute('_href');
+        }
+    }
+    function chintaimenuback() {
+        if ($('.breadcrumb-pointer').length > 0) {
+            if ($('.breadcrumb-pointer')[0].attributes['onclick'] != null && $('.breadcrumb-pointer')[0].attributes['onclick'] != undefined) {
+                var $str = $('.breadcrumb-pointer')[0].attributes['onclick'].nodeValue;
+                var oForm = document.getElementById($str.split("'")[1]);
+                var check = app.utils.formIsDirty(oForm);
+                if (check === true) {
+                    showConfirmDialog('ページの移動をしようとしています。編集したデータの内容を破棄して画面遷移をしてよろしいですか？', '', function () {
+                        window.location.href = chintaimenubackurl;
+                    }, function (ret) {
+                        ret = false;
+                    });
+                } else {
+                    window.location.href = chintaimenubackurl;
+                }
+            } else {
+                window.location.href = chintaimenubackurl;
+            }
+        } else {
+            window.location.href = chintaimenubackurl;
+        }
+    }
+        
+    //CRMから連携された物件を破棄すること確認
+    function clearCrmRoomIdMsg(herfUrl,okFun,request_cd,msg){
+            if(request_cd){
+                if(herfUrl){
+                    if(!msg){
+                        msg = "ページの移動をしようとしています。CRMから連携された反響情報を破棄して画面遷移をしてよろしいですか？ ";
+                    }
+                    showConfirmDialog(msg, '', function(){
+                    if(!okFun){
+                        //画面遷移
+                        window.location.href = herfUrl;
+                    }else{
+                        //関数実行
+                        okFun();
+                    }
+                   }, function(){
+                    $('#confirm_dialog').modal("hide");
+                   }, '', 'はい', 'いいえ');
+                }else{
+                    //関数実行
+                    showConfirmDialog("再度検索をしようとしています。CRMから連携された反響情報を破棄して画面遷移をしてよろしいですか？ ", '', okFun, function(){
+                       $('#confirm_dialog').modal("hide");
+                    }, '', 'はい', 'いいえ');
+                }
+            }else{
+                if(!okFun){
+                    //画面遷移
+                    window.location.href = herfUrl;
+                }else{
+                    //関数実行
+                    okFun();
+                } 
+           }
+    }   
+    
+</script>
+<nav class="navbar navbar-default bb-header no-menu">
+    <div class="container-fluid">
+        <a class="navbar-brand" style="cursor:default;">
+            <img src="/dp/img/logo-brand.png" alt="Daiwa Living Management System" class="hidden-xs"><img src="/dp/img/sp-header-brand.png" alt="Daiwa Living Management System" class="visible-xs">        </a>
+        <a class="navbar-brand-sub" style="cursor:default;">
+            <img src="/dp/img/logo-type.png" alt="Daiwa Living Management System" class="hidden-xs">            <img src="/dp/img/logo-group.png" alt="Daiwa Living Management System" class="hidden-xs">        </a>		
+                    <p class="navbar-text pull-right" id="user_info">
+                <span>
+                    <!--ユーザーID-->
+                    735716001                    <!--担当者コード-->
+                    -0002｜
+                    <!--業者名-->
+                    株式会社　社宅．ｃｏｍ　                    <!--部署名-->
+                                        <!--ユーザー名-->
+                    村上　真史                </span>
+                <span>最終ログイン日:
+                    2026年05月27日                    <!--DPの場合-->
+                                            ｜
+                        <a _href="/dp/Logout" class="navbar-link common-logout" id="common-id" onclick="common_logout(this)">ログアウト</a>
+                                        <!--社員の場合-->
+                                    </span>
+            </p>
+                </div>
+</nav>
+            <div class="main">
+                <div class="bb-wrapper">
+                    <div class="bb-container">
+                        <div class="bb-page-content" style="padding-top: 50px;">
+                            <style>
+    .operation-button{				
+        position: absolute;
+        top: 0px;
+        left: 0;
+        right: 0;
+        z-index:2;
+        height:50px;
+        background-color:#fff;
+        border-bottom: 1px solid #ddd;
+    }
+    .operation-button p{
+        line-height:50px;
+        margin-bottom:0;
+        padding-right:15px;
+    }
+    .bb-page-content{
+        padding-top:50px;
+    }
+    .bb-sidebar-ad{
+        float:right;
+        width:320px;
+        padding:30px;
+    }
+    .sidebar-ad-files{
+        border: 2px solid #ddd;
+        text-align: center;
+    }
+    .sidebar-ad-files-small{
+        margin:0 20px 10px;
+    }
+    .sidebar-ad-files img{
+        padding:2px 0;
+    }
+    .bb-sidebar-ad-title{
+        font-size: 26px;
+    }
+    .sidebar-ad-btn{
+        display: inline-block;
+        width:200px;
+        height:36px;
+        border:none;
+        font-weight:bold;
+        line-height: 36px;
+        border-radius: 30px;
+        background-color: #fa0047;
+        color:#fff;
+        font-family: inherit;
+        font-size: inherit;
+        margin-bottom:10px;
+    }
+    .sidebar-ad-btn-small{
+        width:160px;
+        height:30px;
+        line-height: 30px;
+    }
+    @media (max-width: 1100px){
+        .operation-button{
+            top:54px;
+            height:30px;
+            padding-right:0;
+        }
+        .operation-button p{
+            font-size:12px;
+            line-height:30px;
+        }
+        .operation-button{
+            width:1100px;
+        }
+    }
+    @media (max-width: 1311px){
+        .col-sm-4{
+            width:50% !important 
+        }
+    }
+    .row {
+        margin-bottom: 40px;
+    }
+    .row-banner {
+        display: flex;
+        flex-wrap:wrap;
+        margin-bottom: 10px;        
+    }
+    .row-banner-title {
+        display: flex;
+        flex-wrap:wrap;
+    }
+    .col-sm-2{
+        width:280px;
+    } 
+    .banner-margin-wide{
+        margin-left: 70px;
+    }
+    .container-fluid{
+        border-right:1px solid #ddd;
+    }
+    .syouhinn-setumei{
+        height: 30px;
+        font-size: 18px;
+    }
+    .filling{
+        border: solid;
+        border-color: red;
+        border-width: 4px;        
+    }
+</style>
+<form method="post" accept-charset="utf-8" id="frmMenu" class="bb-form" action="/dp/navi"><div style="display:none;"><input type="hidden" name="_method" value="POST" style=""></div><div id="div-menu">
+    <div id="div-operation-button" class="operation-button">
+        <p class="pull-right">
+            <span><a href="/dp/navi/information" id="information-list" class="navbar-link confirmRedirect">お知らせ一覧</a></span><span id="spn-division"> ｜ </span><span><a href="javaScript:;" id="room-list-init-set" class="navbar-link confirmRedirect" style="">物件リスト初期表示設定</a></span><span id="spn-division"> ｜ </span><span><a href="javaScript:;" id="change-password" class="navbar-link confirmRedirect">パスワード変更</a></span>           
+        </p>
+    </div>
+    <!-- menu -->
+    <div class="container-fluid bg-lgray" style="float:left;width:calc(100% - 320px);">
+        <ol id="lnkBreadcrumb" class="breadcrumb bb-breadcrumb">
+            <li class="active">メニュー</li>
+        </ol>
+        <div class="bb-top-menu">
+            <!-- お知らせリンク(お知らせ管理) -->
+            <div class="row">
+                <div class="col-xs-6 col-sm-4 div-lv-manager hidden">
+                    <a href="/dp/navi/information/InformationImportantManager" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-08.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">お知らせ</h4> 重要なお知らせ・インフォメーションを管理（検索、新規登録など）することが出来ます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- 物件リスト -->
+                <div class="col-xs-6 col-sm-4">
+                    <a href="/dp/navi/room/RoomList/menu" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-02.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">物件リスト</h4> 住居用とテナント用の募集情報を閲覧することが出来ます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- D-Partner会員管理 -->
+                <div class="col-xs-6 col-sm-4 div-lv hidden">
+                    <a href="/dp/navi/member" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-01.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">D-Partner会員管理</h4> D-Partner会員の管理を行うことができます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- 書類ダウンロード -->
+                <div class="col-xs-6 col-sm-4">
+                    <a href="/dp/navi/document/DownloadContractDocumentTransaction">
+                        <div class="panel panel-default">
+                            <div class="panel-body">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-03.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">書類ダウンロード</h4> 契約時書類一式・重要事項説明等をダウンロードすることが出来ます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- 書類アップロード -->
+                <div class="col-xs-6 col-sm-4 div-lv hidden">
+                    <a href="/dp/navi/document/UploadContract">
+                        <div class="panel panel-default">
+                            <div class="panel-body">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-03.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">契約時書類アップロード</h4> 契約時書類をアップロードすることができます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- 各種集計リスト -->
+                <div class="col-xs-6 col-sm-4 div-lv hidden">
+                    <a href="/dp/navi/contract" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-06.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">各種集計リスト</h4> 各種集計リスト画面に遷移します。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- 不動産業者担当者メンテ -->
+                <div class="col-xs-6 col-sm-4 div-lv hidden">
+                    <a href="/dp/navi/gyosya/GyosyaTantoMainte" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-08.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">不動産業者担当者メンテ</h4> 不動産業者の担当者をメンテナンスできます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- D-room商品説明(パンフレット類) -->
+                <div class="col-xs-6 col-sm-4">
+                    <a href="/dp/navi/pamphlet" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-08.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">D-room商品説明(パンフレット類)</h4> D-roomの各種商品説明（パンフレット類）を閲覧することが出来ます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- 計算書コメント編集・登録 -->
+                <div class="col-xs-6 col-sm-4 div-lv-office hidden">
+                    <a href="/dp/navi/statement/EstimateStatementDef" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-08.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">計算書コメント編集・登録</h4> 計算書コメントを編集・登録できます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- D-Partner会員申込 -->
+                <div class="col-xs-6 col-sm-4 div-gyosya-master hidden ">
+                    <a href="/dp/navi/member/PartnerMemberReserve/3">
+                        <div class="panel panel-default" hidden="true">
+                            <div class="panel-body">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-01.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">D-Partner会員申込</h4> D-Partner会員の申込を行うことができます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- D-roomシート 貴社名登録 -->
+                <div class="col-xs-6 col-sm-4 div-gyosya">
+                    <a href="/dp/navi/agency/AgencyDetail" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-01.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">D-roomシート 貴社名登録</h4> D-roomシートのお問い合わせ欄を貴社名にすることが出来ます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- 入居申込一覧 -->
+                <div class="col-xs-6 col-sm-4 web">
+                    <a href="#" id="webApplication">
+                        <div class="panel panel-default">
+                            <div class="panel-body">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-06.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">入居申込一覧 </h4> 入居申込WEBシステムに遷移し、WEBの入居申込を検索できます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!--  メンテナンス設定-->
+                <div class="col-xs-6 col-sm-4 div-lv-maintain hidden">
+                    <a href="/dp/navi/maintenance/manage/index" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-01.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">メンテナンス設定</h4>D-roomNAVIメンテナンスを設定することできます。
+                                    </div>                                    
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- 入居時設備のご案内-->
+                <div class="col-xs-6 col-sm-4">
+                    <a href="/dp/OpenPdf?file=%2Ffiles%2Fmanual%2FNyukyoSetubi.pdf" target="_blank" style="">
+                        <div class="panel panel-default">
+                            <div class="panel-body" style="">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-03.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">入居時設備のご案内</h4> 入居設備のご案内を閲覧することができます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div> 
+               <div class="col-xs-6 col-sm-4">
+                    <a href="/dp/navi/filling_example/1" style="">
+                        <div class="panel panel-default filling">
+                            <div class="panel-body" style="background:#D9D9D9;">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-03.png" alt="..." class="media-object" style="border-width: 2px;border-style: solid;border-color: red;">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading" style="font-size: 20px;font-weight: bold;">記入例（賃貸借契約書・重説）</h4>
+                                        <h4 style="margin-top: 0px;margin-bottom: 0px;font-weight: bold;font-size: 15px;"> 賃貸借契約書・重説の記入例が確認できます。</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                <!-- 記入例（法人申込書【書面】-->
+                <div class="col-xs-6 col-sm-4">
+                    <a href="/dp/OpenPdf?file=%2Ffiles%2Fmanual%2FKinyureiHojin.pdf" target="_blank" style="">
+                        <div class="panel panel-default" style="">
+                            <div class="panel-body">
+                                <div class="media media-resize">
+                                    <div class="media-left">
+                                        <img src="/dp/img/top-03.png" alt="..." class="media-object">                                    </div>
+                                    <div class="media-body">
+                                        <h4 class="media-heading">記入例（法人申込書【書面】）</h4> 法人申込書【書面】の記入例が確認できます。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </a>
+                </div>
+            </div> 
+        </div>
+        <div>
+            <div class="row-banner-title">
+                <h4><b><span style="color: #000;">■株式会社イントラスト</span></b></h4>
+            </div>
+            <div class="row-banner-title">
+                <h4>&nbsp;&nbsp;&nbsp;<b><span style="color: #000;">【支払方法：クレジットカード商品】</span></b></h4>
+            </div>            
+            <div class="row-banner">
+                <div class="banner-margin-wide">
+                    <div class="col-sm-2">
+                        <div>
+                            <div class="syouhinn-setumei"><b><span style="color: #000;">【WEB申込対応商品】</span></b></div>
+                            <div class="sidebar-ad-files mb10" style="color: #fff;">
+                                <h1 class="bb-sidebar-ad-title"><b><span style="color: #000;">D-Support α</span></b></h1>
+                                <a href="/dp/OpenPdf?file=%2Ffiles%2Fmanual%2FDScooperate.pdf" class="sidebar-ad-btn" target="_blank" style="">商品ガイド</a>
+                                <a href="/dp/OpenPdf?file=%2Ffiles%2Fmanual%2FDSleaflet.pdf" class="sidebar-ad-btn" target="_blank" style="">リーフレット</a>
+                                <a href="/dp/OpenPdf?file=%2Ffiles%2Fmanual%2FDSprofile.pdf" class="sidebar-ad-btn" target="_blank" style="">個人情報同意書</a>
+                                <a href="/dp/OpenPdf?file=%2Ffiles%2Fmanual%2FDSACrecaData.pdf" class="sidebar-ad-btn" target="_blank" style="">クレカ資料</a>
+                            </div>
+                        </div>
+                    </div>                             
+                    <div class="col-sm-2">
+                        <div>
+                            <div class="syouhinn-setumei"></div>
+                            <div class="sidebar-ad-files mb10" style="color: #fff;">
+                                <h1 class="bb-sidebar-ad-title"><b><span style="color: #000;">D-Support Creca</span></b></h1>
+                                <a href="/dp/OpenPdf?file=%2Ffiles%2Fmanual%2FDSGoodsGuideCreca.pdf" class="sidebar-ad-btn" target="_blank" style="">商品ガイド</
