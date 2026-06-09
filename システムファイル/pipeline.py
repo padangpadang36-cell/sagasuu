@@ -179,6 +179,14 @@ async def run_pipeline(
             hearing_data = load_pasted_email_file(paste_file)
             shinkoku_map = build_shinkoku_map(hearing_data)
             rows = merge_gmail_data(rows, shinkoku_map)
+
+            # ── クロスチェック: メールにあってExcelにない進捗ID を警告 ──
+            email_ids = set(shinkoku_map.keys())
+            excel_ids = {str(r.get('進捗ID', '')).strip() for r in rows if r.get('進捗ID')}
+            missing_in_excel = email_ids - excel_ids
+            if missing_in_excel:
+                print(f"  ⚠ メールにあってExcelに見つからない進捗ID: {', '.join(sorted(missing_in_excel))}")
+                print(f"     → Excelにその進捗IDの行がないため検索されません。Excelを確認してください。")
         except Exception as e:
             print(f"  ⚠ 貼り付けファイル読み込みエラー: {e}")
             import traceback; traceback.print_exc()

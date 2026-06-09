@@ -223,7 +223,13 @@ async def login_atbb(page, shot_dir: Path) -> bool:
 # ══════════════════════════════════════════════════════════
 
 async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir: Path) -> tuple[list[dict], object]:
-    print(f"── 物件検索中: {area} / {rent_max}円 / {layout} ──")
+    print(f"── ATBB 物件検索: area={repr(area)} / {rent_max}円 / {layout} ──")
+
+    # エリアが空の場合は全国検索になるためスキップ
+    if not area.strip():
+        print("  ATBB: エリア未指定のため検索をスキップします")
+        return [], page
+
     await page.screenshot(path=str(shot_dir / "04_logged_in.png"))
 
     properties = []
@@ -1957,7 +1963,12 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
       4. rental_cost2 で家賃上限を設定
       5. 「検索」ボタンをクリック → 結果を取得
     """
-    print(f"── リアブロ 物件検索: {area} / {rent_max}円 ──")
+    print(f"── リアブロ 物件検索: area={repr(area)} / {rent_max}円 ──")
+
+    # エリア・勤務地住所の両方が空の場合は都市フィルターなし検索になるためスキップ
+    if not area.strip() and not work_address.strip():
+        print("  リアブロ: エリア未指定のため検索をスキップします")
+        return []
 
     # ── JS: .room_system_menu[title] から物件情報を抽出 ──────
     EXTRACT_ROOMS_JS = """

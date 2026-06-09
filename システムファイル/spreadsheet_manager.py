@@ -241,12 +241,14 @@ def merge_gmail_data(rows: list[dict], shinkoku_map: dict[str, dict]) -> list[di
         rent_limit, moving_required, resident_name, remarks
     """
     merged_count = 0
+    unmatched_ids = []
     for row in rows:
         sid = row.get('進捗ID')
         if not sid:
             continue
         info = shinkoku_map.get(str(sid).strip())
         if not info:
+            unmatched_ids.append(str(sid).strip())
             continue
 
         # 案件ID（フォルダ名・ファイル名に使用）
@@ -255,6 +257,7 @@ def merge_gmail_data(rows: list[dict], shinkoku_map: dict[str, dict]) -> list[di
         # 勤務地住所（最優先）
         if info.get('work_address'):
             row['勤務地住所'] = info['work_address']
+            print(f"    進捗ID={sid}: 勤務地住所={info['work_address'][:40]}")
         # 最寄り駅
         if info.get('nearest_station'):
             row['最寄り駅'] = info['nearest_station']
@@ -288,6 +291,14 @@ def merge_gmail_data(rows: list[dict], shinkoku_map: dict[str, dict]) -> list[di
         merged_count += 1
 
     print(f"  Gmail紐付け: {merged_count}行に依頼情報を補完しました")
+    if unmatched_ids:
+        # 件数が多い場合は先頭5件だけ表示（ダミーIDが大量にある場合の対策）
+        sample = unmatched_ids[:5]
+        rest = len(unmatched_ids) - len(sample)
+        msg = ', '.join(sample)
+        if rest > 0:
+            msg += f" 他{rest}件"
+        print(f"  ⚠ メール未紐付け（Excel行には進捗IDがあるがメールになし）: {msg}")
     return rows
 
 
@@ -483,8 +494,10 @@ def generate_search_params(rows: list[dict]) -> list[dict]:
         # 希望エリア（最寄り駅 or 市区町村）
         area = _search_area(row)
         if not area:
-            # 勤務地未取得の場合でも処理は続ける（エリア空のまま）
-            print(f"  ⚠ 進捗ID={sid} 勤務地未取得（Gmail未連携または未抽出）")
+            # エリアなしは全国検索になり無関係な物件が出るためスキップ
+            print(f"  ⚠ 進捗ID={sid}: 勤務地・最寄り駅が未取得のため検索対象外（エリアなし）")
+            skipped += 1
+            continue
 
         # 家賃上限
         try:
