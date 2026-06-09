@@ -1565,7 +1565,13 @@ async def login_droom(page, shot_dir: Path) -> bool:
 
 async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
     """D-Room で物件を検索し、room_id 付き物件リストを返す"""
-    print(f"── D-Room 物件検索: {area} / {rent_max}円 ──")
+    print(f"── D-Room 物件検索: area={repr(area)} / {rent_max}円 ──")
+
+    # エリアが空の場合は全件検索になり「最大検索件数」エラーになるためスキップ
+    if not area.strip():
+        print("  D-Room: エリア未指定のため検索をスキップします")
+        return []
+
     await page.goto(DROOM_ROOMLIST_URL, wait_until="domcontentloaded", timeout=20000)
     await asyncio.sleep(3)
 
@@ -1584,8 +1590,14 @@ async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
     except Exception as e:
         print(f"  ⚠ 家賃上限入力エラー: {e}")
 
-    # フォーム送信（JavaScript で submit）
-    await page.evaluate("() => { const f = document.querySelector('form'); if (f) f.submit(); }")
+    # フォーム送信（address フィールドを持つフォームを優先して submit）
+    await page.evaluate("""
+        () => {
+            const forms = Array.from(document.querySelectorAll('form'));
+            const target = forms.find(f => f.querySelector('input[name="address"]')) || forms[0];
+            if (target) target.submit();
+        }
+    """)
     await asyncio.sleep(5)
     try:
         await page.wait_for_load_state("domcontentloaded", timeout=15000)
@@ -1595,6 +1607,12 @@ async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
 
     await page.screenshot(path=str(shot_dir / "dr_02_search_result.png"))
     print(f"  D-Room 検索結果URL: {page.url}")
+
+    # 最大検索件数エラーを検出 → エリアで絞り込めなかった場合は空リストを返す
+    page_text = await page.evaluate("() => document.body.innerText")
+    if '最大検索件数' in page_text:
+        print(f"  ⚠ D-Room: 検索件数が上限を超えました（エリア '{area}' では絞り込めませんでした）")
+        return []
 
     # 物件チェックボックス（value が「数字-数字-数字」形式）から物件情報を抽出
     # bukken_name 属性に建物名、前の行に住所・賃料が含まれている
