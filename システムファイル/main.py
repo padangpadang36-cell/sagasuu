@@ -448,6 +448,94 @@ async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir
     return properties, page
 
 
+# ══════════════════════════════════════════════════════════
+#  物件フィルタリング
+# ══════════════════════════════════════════════════════════
+
+def _parse_rent_yen(rent_str: str) -> int | None:
+    """
+    賃料文字列を円（int）に変換する。
+    例: '7.5万円' → 75000, '75,000円' → 75000, '75000' → 75000
+    解析不能の場合は None を返す。
+    """
+    if not rent_str:
+        return None
+    s = str(rent_str).strip()
+    # "X.X万円" / "XX万円"
+    m1 = re.search(r'(\d+\.?\d*)万円', s)
+    if m1:
+        return int(float(m1.group(1)) * 10000)
+    # "XX,XXX円" / "XXXXX円"
+    m2 = re.search(r'([\d,]+)円', s)
+    if m2:
+        return int(m2.group(1).replace(',', ''))
+    # 数字のみ（5桁以上なら円とみなす）
+    m3 = re.fullmatch(r'(\d+)', s)
+    if m3:
+        v = int(m3.group(1))
+        return v if v >= 10000 else None
+    return None
+
+
+def _parse_age_years(age_str: str) -> int | None:
+    """
+    築年数文字列を年数（int）に変換する。
+    '新築' → 0, '築5年' → 5, '築5年4ヶ月' → 5
+    解析不能の場合は None を返す（フィルタをスキップ）。
+    """
+    if not age_str:
+        return None
+    s = str(age_str).strip()
+    if '新築' in s:
+        return 0
+    m = re.search(r'築(\d+)年', s)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def filter_properties(
+    props: list[dict],
+    rent_max: int,
+    max_age_years: int = 20,
+) -> list[dict]:
+    """
+    物件リストから不適切な物件を除外する。
+
+    除外条件:
+    ① 家賃が低すぎる: 上限家賃の30%未満、かつ10,000円未満
+       例: rent_max=100,000 → 30,000円未満の物件を除外
+    ② 築年数が古すぎる: max_age_years 年超の物件を除外（デフォルト20年）
+       ※ 築年数情報がない物件は除外しない
+    """
+    min_rent = max(10_000, int(rent_max * 0.30))
+    filtered = []
+    for p in props:
+        name_short = p.get('name', '不明')[:25]
+        rent_str = p.get('rent', '')
+        rent_yen = _parse_rent_yen(rent_str)
+
+        # ① 家賃チェック
+        if rent_yen is not None and rent_yen < min_rent:
+            min_man = min_rent // 10000
+            print(f"  [フィルタ除外] {name_short}: 家賃{rent_str} → {rent_yen:,}円 < 下限{min_man}万円")
+            continue
+
+        # ② 築年数チェック
+        age_str = p.get('age', '')
+        age_years = _parse_age_years(age_str)
+        if age_years is not None and age_years > max_age_years:
+            print(f"  [フィルタ除外] {name_short}: {age_str} → {age_years}年 > 上限{max_age_years}年")
+            continue
+
+        filtered.append(p)
+
+    removed = len(props) - len(filtered)
+    if removed:
+        print(f"  フィルタ結果: {len(props)}件 → {len(filtered)}件（{removed}件除外）")
+    return filtered
+
+
 def decode_price_code(code: str) -> str:
     """ATBBの価格コードをダウンロード&OCRでデコードして万円表示を返す"""
     import re as _re
@@ -2772,6 +2860,14 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
         for idx2, rp in enumerate(reabro_props):
             rp['source'] = 'reabro'
             rp['reabro_idx'] = idx2
+
+        # ⑥-a フィルタリング（家賃下限・築年数）
+        print(f"  ── 物件フィルタリング（家賃下限: 上限の30% / 築年数: 20年以内）──")
+        atbb_props   = filter_properties(atbb_props,   rent_max)
+        hm_props     = filter_properties(hm_props,     rent_max)
+        droom_props  = filter_properties(droom_props,  rent_max)
+        lp_props     = filter_properties(lp_props,     rent_max)
+        reabro_props = filter_properties(reabro_props, rent_max)
 
         properties = []
         # 各ソースの先頭1件を追加
