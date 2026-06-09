@@ -19,6 +19,17 @@ from typing import Optional
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
+# 都道府県名リスト（住所中の二重プレフィックス検出に使用）
+_KNOWN_PREFECTURES = (
+    '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+    '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+    '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県', '岐阜県',
+    '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府', '兵庫県',
+    '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県', '山口県',
+    '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県', '長崎県',
+    '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県',
+)
+
 # stdout/stderr のUTF-8化（単体実行時のみ。モジュールとして呼ばれる時はスキップ）
 if __name__ == '__main__' and hasattr(sys.stdout, 'buffer'):
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -384,11 +395,12 @@ def _extract_city_from_address(address: str) -> str:
     就業先住所から市区町村名を抽出してATBBフリーワード検索用エリアを生成する。
 
     例:
-      '茨城県 かすみがうら市上稲吉2046番地'  → 'かすみがうら市'
-      '東京都港区西新橋1-1-1'               → '港区'
-      '大阪府大阪市北区梅田1-1'             → '大阪市北区'  # 政令市は区まで含める
-      '愛知県名古屋市中区三の丸'             → '名古屋市中区'
-      '栃木県宇都宮市馬場通り4-1-1'         → '宇都宮市'
+      '茨城県 かすみがうら市上稲吉2046番地'          → 'かすみがうら市'
+      '東京都港区西新橋1-1-1'                       → '港区'
+      '大阪府大阪市北区梅田1-1'                     → '大阪市北区'  # 政令市は区まで含める
+      '愛知県名古屋市中区三の丸'                     → '名古屋市中区'
+      '栃木県宇都宮市馬場通り4-1-1'                 → '宇都宮市'
+      '岩手県 岩手県奥州市江刺岩谷堂字松長根52'       → '奥州市'  # 都道府県二重入力に対応
     """
     if not address:
         return ''
@@ -398,6 +410,12 @@ def _extract_city_from_address(address: str) -> str:
         # 住所が都道府県のみの場合
         m = re.search(r'(.+?[都道府県])', address)
         return m.group(1) if m else address[:10]
+    # 入力データの不備で都道府県が二重になっている場合（例: "岩手県奥州市..."）に再除去
+    # ※ re.match での判定は「宇都宮市」の「都」等で誤検知するため、既知の都道府県名リストで正確に判定する
+    for pref in _KNOWN_PREFECTURES:
+        if addr.startswith(pref):
+            addr = addr[len(pref):].lstrip()
+            break
     # 政令市（市の後に区が続く）: 「〇〇市〇〇区」まで含める
     m = re.search(r'(\S+?市)(\S+?区)', addr)
     if m:
