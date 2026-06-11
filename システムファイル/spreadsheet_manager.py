@@ -287,6 +287,9 @@ def merge_gmail_data(rows: list[dict], shinkoku_map: dict[str, dict]) -> list[di
         # 入居希望日補完
         if not row.get('入居希望日') and info.get('move_in_date'):
             row['入居希望日'] = info['move_in_date']
+        # 現住所（個人の所在地）
+        if info.get('current_address'):
+            row['現住所'] = info['current_address']
 
         merged_count += 1
 
@@ -543,6 +546,7 @@ def generate_search_params(rows: list[dict]) -> list[dict]:
             'メールアドレス':  row.get('メールアドレス', ''),
             '携帯電話番号':    row.get('携帯電話番号', ''),
             'その他要望':      row.get('その他要望', ''),
+            '現住所':          row.get('現住所', ''),   # 個人の現住所（メール由来）
         })
 
     print(f"  検索パラメータ生成: {len(params)}件 / スキップ {skipped}行")
@@ -631,6 +635,155 @@ def update_spreadsheet(
     wb.save(str(out_path))
     print(f"  スプレッドシート保存: 入力データ/完成版/{out_path.name}")
     return out_path
+
+
+# ══════════════════════════════════════════════════════════
+#  案件データベース（処理済み案件の蓄積）
+# ══════════════════════════════════════════════════════════
+
+# データベースの列定義（順序・表示名）
+DB_COLUMNS = [
+    ('処理日時',             '処理日時'),
+    ('案件ID',               '案件ID'),
+    ('進捗ID',               '進捗ID'),
+    ('氏名',                 '氏名'),
+    ('現住所',               '現住所（個人）'),
+    ('勤務地住所',           '検索対象住所（転勤先）'),
+    ('希望エリア',           '希望エリア'),
+    ('企業名',               '企業名'),
+    ('就業開始日',           '就業開始日'),
+    ('家賃上限（円）',       '家賃上限（円）'),
+    ('入居形態_依頼',        '入居形態'),
+    ('入居希望日',           '入居希望日'),
+    ('通勤方法_依頼',        '通勤方法'),
+    ('検索ステータス',       '検索ステータス'),
+    # ── 以下は引越し手配用の列（今後追加予定） ──────────
+    # ('選定物件名',         '選定物件名'),
+    # ('選定物件住所',       '選定物件住所'),
+    # ('お客様回答',         'お客様回答'),
+    # ('引越し業者',         '引越し業者'),
+    # ('引越し日',           '引越し日'),
+    # ('手配状況',           '手配状況'),
+]
+
+
+def append_to_case_database(row: dict, db_path: Path) -> None:
+    """
+    処理済み案件を案件データベース Excel に追記（または更新）する。
+
+    - db_path が存在しない場合は新規作成する。
+    - 同じ案件ID（または進捗ID）が既に存在する場合は上書き更新する。
+    - 案件ID・進捗ID がどちらもない行はスキップする。
+
+    Parameters
+    ----------
+    row     : generate_search_params() が返す案件パラメータ辞書
+    db_path : データベース Excel のパス
+    """
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+    # ── ファイルのロードまたは新規作成 ──
+    if db_path.exists():
+        wb = openpyxl.load_workbook(str(db_path))
+        ws = wb.active
+    else:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = '案件データベース'
+
+        # ヘッダー行を作成
+        header_fill = PatternFill('solid', start_color='1F4E79')
+        header_font = Font(bold=True, color='FFFFFF', size=10)
+        thin = Side(style='thin', color='CCCCCC')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        for col_idx, (_, display_name) in enumerate(DB_COLUMNS, 1):
+            cell = ws.cell(row=1, column=col_idx, value=display_name)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.border = border
+
+        # 列幅を設定
+        col_widths = {
+            1: 18,  # 処理日時
+            2: 12,  # 案件ID
+            3: 10,  # 進捗ID
+            4: 14,  # 氏名
+            5: 36,  # 現住所
+            6: 36,  # 検索対象住所
+            7: 14,  # 希望エリア
+            8: 30,  # 企業名
+            9: 14,  # 就業開始日
+            10: 14, # 家賃上限
+            11: 10, # 入居形態
+            12: 14, # 入居希望日
+            13: 18, # 通勤方法
+            14: 12, # 検索ステータス
+        }
+        for col_num, width in col_widths.items():
+            ws.column_dimensions[
+                openpyxl.utils.get_column_letter(col_num)
+            ].width = width
+
+        ws.row_dimensions[1].height = 30
+        ws.freeze_panes = 'A2'
+
+    # ── 既存行の検索（案件ID または 進捗ID で重複チェック） ──
+    case_id   = str(row.get('案件ID', '') or '').strip()
+    shinkoku  = str(row.get('管理番号', '') or '').strip()   # 検索パラメータでは '管理番号'
+
+    target_row_num = None
+    for r in ws.iter_rows(min_row=2):
+        existing_case_id  = str(r[1].value or '').strip()   # 2列目: 案件ID
+        existing_shinkoku = str(r[2].value or '').strip()   # 3列目: 進捗ID
+        if (case_id and existing_case_id == case_id) or \
+           (shinkoku and existing_shinkoku == shinkoku):
+            target_row_num = r[0].row
+            break
+
+    # 書き込み先行番号を決定
+    is_update = target_row_num is not None
+    if not is_update:
+        target_row_num = ws.max_row + 1
+
+    # ── 書き込む値を組み立て ──
+    area = row.get('希望エリア') or ''
+
+    values = {
+        '処理日時':        datetime.now().strftime('%Y/%m/%d %H:%M'),
+        '案件ID':          case_id,
+        '進捗ID':          shinkoku,
+        '氏名':            row.get('氏名', ''),
+        '現住所':          row.get('現住所', ''),
+        '勤務地住所':      row.get('勤務地住所', ''),
+        '希望エリア':      area,
+        '企業名':          row.get('企業名', ''),
+        '就業開始日':      row.get('就業開始日', ''),
+        '家賃上限（円）':  row.get('家賃上限（円）', ''),
+        '入居形態_依頼':   row.get('入居形態_依頼', '') or row.get('入居形態', ''),
+        '入居希望日':      row.get('入居希望日', ''),
+        '通勤方法_依頼':   row.get('通勤方法_依頼', '') or row.get('通勤方法', ''),
+        '検索ステータス':  row.get('検索ステータス', '完了'),
+    }
+
+    # ── セルに書き込み ──
+    row_fill  = PatternFill('solid', start_color='EBF3FB')
+    thin      = Side(style='thin', color='CCCCCC')
+    border    = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    for col_idx, (key, _) in enumerate(DB_COLUMNS, 1):
+        cell = ws.cell(row=target_row_num, column=col_idx, value=values.get(key, ''))
+        cell.fill = row_fill
+        cell.alignment = Alignment(vertical='center', wrap_text=False)
+        cell.border = border
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(str(db_path))
+
+    action = '更新' if is_update else '追記'
+    print(f"  案件DB {action}: {db_path.name}  行{target_row_num}  "
+          f"案件ID={case_id}  {row.get('氏名', '')}  エリア={area}")
 
 
 # ══════════════════════════════════════════════════════════

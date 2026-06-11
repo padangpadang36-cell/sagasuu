@@ -360,6 +360,7 @@ def build_shinkoku_map(hearing_data: list[dict]) -> dict[str, dict]:
             'case_id':          d.get('case_id', ''),       # 案件ID（フォルダ・ファイル名に使用）
             'work_address':     d.get('work_address', ''),
             'work_address_raw': d.get('work_address_raw', ''),
+            'current_address':  d.get('current_address', ''),  # 現住所（個人の所在地）
             'nearest_station':  d.get('nearest_station', ''),
             'work_start_date':  d.get('work_start_date', ''),
             'company_name':     d.get('company_name', ''),

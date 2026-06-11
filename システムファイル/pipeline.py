@@ -35,6 +35,7 @@ CONFIG_DIR     = BASE_DIR / "config"
 OUTPUT_DIR     = PROJECT_ROOT / "出力PDF"
 INPUT_DIR      = PROJECT_ROOT / "入力データ"          # 入力 Excel の置き場
 KANSEI_DIR     = INPUT_DIR / "完成版"                 # _完成版_ ファイルの保存先
+DB_PATH        = INPUT_DIR / "案件データベース.xlsx"  # 処理済み案件の蓄積データベース
 COMPANY_RULES_PATH = CONFIG_DIR / "company_rules.json"
 
 
@@ -162,7 +163,8 @@ async def run_pipeline(
     # ─── Step 1: スプレッドシート読み込み ───
     print(f"\n[Step 1] ヒアリングスプレッドシート読み込み")
     from spreadsheet_manager import load_hearing_responses, merge_gmail_data, \
-        merge_company_rules, generate_search_params, update_spreadsheet
+        merge_company_rules, generate_search_params, update_spreadsheet, \
+        append_to_case_database
 
     rows, col_idx = load_hearing_responses(xlsx_path)
 
@@ -263,10 +265,19 @@ async def run_pipeline(
 
             # ステータスを更新してスプレッドシートに反映（進捗IDで紐付け）
             shinkoku_id = params.get('管理番号')
+            search_status = '完了' if pdf_path else 'エラー'
             for r in rows:
                 if r.get('進捗ID') == shinkoku_id:
-                    r['検索ステータス'] = '完了' if pdf_path else 'エラー'
+                    r['検索ステータス'] = search_status
                     break
+
+            # ─── 案件データベースに追記（処理済み案件の蓄積）───
+            db_params = dict(params)
+            db_params['検索ステータス'] = search_status
+            try:
+                append_to_case_database(db_params, DB_PATH)
+            except Exception as db_err:
+                print(f"  ⚠ 案件DB書き込みエラー: {db_err}")
 
     # ─── Step 7: 最終スプレッドシート保存（ステータス更新） ───
     print(f"\n[Step 7] ステータス更新後スプレッドシート保存")
