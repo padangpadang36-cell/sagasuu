@@ -2071,7 +2071,7 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                 const row = el.closest('tr') || el.closest('li') || el.parentElement;
                 const text = row ? row.innerText.replace(/\\s+/g,' ').trim() : '';
                 let rent = '', layout = '', sq = '';
-                const rentM = text.match(/(\\d+\\.?\\d*)(万円|円)/);
+                const rentM = text.match(/([\\d,]+\\.?\\d*)(万円|円)/);
                 if (rentM) rent = rentM[0];
                 const layoutM = text.match(/([1-9][LKDS]+|ワンルーム)/i);
                 if (layoutM) layout = layoutM[0];
