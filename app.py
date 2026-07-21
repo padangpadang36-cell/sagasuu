@@ -350,12 +350,7 @@ with col_refresh:
     if st.button("🔄 更新", key="refresh_files"):
         st.rerun()
 with col_open:
-    if st.button("📂 出力PDFフォルダを開く", key="open_output_dir"):
-        if OUTPUT_DIR.exists():
-            import subprocess as _sp
-            _sp.Popen(["explorer", str(OUTPUT_DIR)])
-        else:
-            st.warning("出力PDFフォルダがまだありません。")
+    pass  # Webアプリではフォルダを開く機能は非対応
 
 if OUTPUT_DIR.exists():
     case_dirs = sorted(
@@ -386,11 +381,6 @@ if OUTPUT_DIR.exists():
             label = f"📂 {case_dir.name}　（PDF {len(pdfs)}件 ／ {mtime}）"
 
             with st.expander(label, expanded=False):
-                btn_col, info_col = st.columns([2, 5])
-                with btn_col:
-                    if st.button("エクスプローラーで開く", key=f"open_{case_dir.name}"):
-                        import subprocess as _sp
-                        _sp.Popen(["explorer", str(case_dir)])
 
                 if pdfs:
                     for pdf in pdfs:
@@ -411,12 +401,7 @@ col_xls_refresh, col_xls_open = st.columns([1, 4])
 with col_xls_refresh:
     pass  # 上の更新ボタンで兼用
 with col_xls_open:
-    if st.button("📂 完成版フォルダを開く", key="open_kansei_dir"):
-        if KANSEI_DIR.exists():
-            import subprocess as _sp
-            _sp.Popen(["explorer", str(KANSEI_DIR)])
-        else:
-            st.warning("完成版フォルダがまだありません。")
+    pass  # Webアプリではフォルダを開く機能は非対応
 
 if KANSEI_DIR.exists():
     kansei_files = sorted(
