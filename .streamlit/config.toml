@@ -4,6 +4,7 @@ gatherUsageStats = false
 [server]
 headless = false
 port = 8501
+maxUploadSize = 200
 
 [theme]
 base = "light"
