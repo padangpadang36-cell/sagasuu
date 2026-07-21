@@ -327,6 +327,20 @@ if run_btn and can_run:
                         with st.expander(f"📂 {case_dir.name}　（{len(pdfs)}件）", expanded=True):
                             for pdf in pdfs:
                                 st.markdown(f"&nbsp;&nbsp;📄 `{pdf.name}`")
+                            # ZIPダウンロードボタン
+                            import zipfile, io as _io
+                            zip_buf = _io.BytesIO()
+                            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                                for pdf in pdfs:
+                                    zf.write(pdf, pdf.name)
+                            zip_buf.seek(0)
+                            st.download_button(
+                                label=f"⬇️ ZIPでダウンロード（{len(pdfs)}件）",
+                                data=zip_buf,
+                                file_name=f"{case_dir.name}.zip",
+                                mime="application/zip",
+                                key=f"zip_{case_dir.name}",
+                            )
     else:
         st.error("❌ 処理中にエラーが発生しました。上のログを確認してください。")
         st.info("💡 ログの最後のエラーメッセージを担当者に連絡してください。")
@@ -386,6 +400,19 @@ if OUTPUT_DIR.exists():
                     for pdf in pdfs:
                         size_kb = pdf.stat().st_size // 1024
                         st.markdown(f"&nbsp;&nbsp;📄 `{pdf.name}` &nbsp; {size_kb} KB")
+                    import zipfile, io as _io
+                    zip_buf = _io.BytesIO()
+                    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                        for pdf in pdfs:
+                            zf.write(pdf, pdf.name)
+                    zip_buf.seek(0)
+                    st.download_button(
+                        label=f"⬇️ ZIPでダウンロード（{len(pdfs)}件）",
+                        data=zip_buf,
+                        file_name=f"{case_dir.name}.zip",
+                        mime="application/zip",
+                        key=f"zip2_{case_dir.name}",
+                    )
                 else:
                     st.caption("（PDFファイルがありません）")
     else:
