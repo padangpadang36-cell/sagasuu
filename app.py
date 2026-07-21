@@ -57,6 +57,10 @@ if "accumulated_emails" not in st.session_state:
     st.session_state.accumulated_emails = []   # List[str] 追加済みメール本文
 if "paste_key" not in st.session_state:
     st.session_state.paste_key = 0             # テキストエリアをクリアするためのキー
+if "uploaded_file_data" not in st.session_state:
+    st.session_state.uploaded_file_data = None  # アップロードされたExcelファイルのデータ
+if "uploaded_file_name" not in st.session_state:
+    st.session_state.uploaded_file_name = None
 
 # ── ヘルパー: メール本文からプレビュー情報を抽出 ─────────────
 def _parse_mail_preview(text: str) -> dict:
@@ -182,7 +186,11 @@ with col_excel:
     )
 
     if uploaded_file:
+        st.session_state.uploaded_file_data = uploaded_file.getvalue()
+        st.session_state.uploaded_file_name = uploaded_file.name
         st.success(f"📄 {uploaded_file.name}")
+    elif st.session_state.uploaded_file_data:
+        st.success(f"📄 {st.session_state.uploaded_file_name}")
 
     # 入力データフォルダの既存ファイル
     existing_excels = []
@@ -220,7 +228,7 @@ with col_excel:
 st.divider()
 
 has_mail  = bool(st.session_state.accumulated_emails)
-has_excel = bool(uploaded_file) or bool(existing_excels)
+has_excel = bool(uploaded_file) or bool(st.session_state.uploaded_file_data) or bool(existing_excels)
 can_run   = has_mail and has_excel
 
 if not has_mail:
@@ -245,10 +253,12 @@ if run_btn and can_run:
     PASTE_FILE.write_text(combined_mail, encoding="utf-8")
 
     # ② Excel を保存
-    if uploaded_file:
+    file_data = uploaded_file.getvalue() if uploaded_file else st.session_state.uploaded_file_data
+    file_name = uploaded_file.name if uploaded_file else st.session_state.uploaded_file_name
+    if file_data:
         INPUT_DIR.mkdir(exist_ok=True)
-        save_path = INPUT_DIR / uploaded_file.name
-        save_path.write_bytes(uploaded_file.getvalue())
+        save_path = INPUT_DIR / file_name
+        save_path.write_bytes(file_data)
 
     # ③ pipeline.py の引数を組み立てる
     cmd = [sys.executable, "-u", str(PIPELINE)]
