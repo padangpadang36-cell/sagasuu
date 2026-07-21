@@ -2696,9 +2696,8 @@ def generate_pdf(case: dict, properties: list[dict], map_shots: dict,
 
 async def process_case(playwright, case: dict, case_num: int, font_name: str):
     browser = await playwright.chromium.launch(
-        headless=False,
+        headless=True,
         slow_mo=400,
-        channel="chrome",
     )
     ctx = await browser.new_context(
         viewport={"width": 1280, "height": 900},
