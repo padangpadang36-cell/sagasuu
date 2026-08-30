@@ -1222,13 +1222,25 @@ async def search_homemate(page, area: str, shot_dir: Path,
 
     if not target_city_val and len(citysb_options) > 1:
         # 「○○市の区から選択」のような政令指定都市限定グループは、
-        # そのものずばりの市名がエリア指定に含まれていない限り誤選択の
-        # 原因になるため除外し、汎用グループ（市から選択 等）を優先する
-        generic_opts = [o for o in citysb_options if o['v'] and 'の区から選択' not in o['t']]
-        candidates = generic_opts if generic_opts else [o for o in citysb_options if o['v']]
-        if candidates:
-            target_city_val = candidates[0]['v']
-            print(f"  市選択(先頭): {candidates[0]['t']}")
+        # その市名（例: 千葉市）がエリア指定に実際に含まれる場合のみ選択する。
+        # 含まれない場合にこのグループへ誤って入ってしまうと、全く関係ない
+        # 市（グループの先頭市）を検索してしまうため除外し、
+        # 汎用グループ（市から選択 等）を優先する。
+        designated_match = None
+        for o in citysb_options:
+            m = _re.match(r'^(.+市)の区から選択$', o['t'] or '')
+            if m and normalize_place_name(m.group(1)) in area_norm:
+                designated_match = o
+                break
+        if designated_match:
+            target_city_val = designated_match['v']
+            print(f"  市選択(政令指定都市): {designated_match['t']}")
+        else:
+            generic_opts = [o for o in citysb_options if o['v'] and 'の区から選択' not in o['t']]
+            candidates = generic_opts if generic_opts else [o for o in citysb_options if o['v']]
+            if candidates:
+                target_city_val = candidates[0]['v']
+                print(f"  市選択(先頭): {candidates[0]['t']}")
 
     if target_city_val:
         await page.select_option('select[name="citysb"]', target_city_val)
