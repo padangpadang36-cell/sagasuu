@@ -2558,6 +2558,32 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
         # ── Step5: 結果取得 ───────────────────────────────────────
         landed_on_unexpected_page = "search_cookie" in page.url or "estate" not in page.url
         if landed_on_unexpected_page:
+            # 診断用: このページで実際に何が表示・要求されているか特定できて
+            # いないため、本文テキストをログに出力する（次回発生時の解析用）
+            try:
+                page_text = await page.evaluate("() => document.body.innerText.slice(0, 800)")
+                print(f"  [診断] {page.url[:80]} の本文: {page_text!r}")
+            except Exception as diag_e:
+                print(f"  [診断] 本文取得失敗: {diag_e}")
+
+            # 単純な確認・続行ボタンで突破できる可能性があるため試す
+            for btn_text in ["続ける", "同意する", "はい", "OK", "検索を続ける", "そのまま進む", "許可する"]:
+                try:
+                    btn = page.locator(f'button:has-text("{btn_text}"), a:has-text("{btn_text}"), input[value="{btn_text}"]').first
+                    if await btn.is_visible(timeout=1500):
+                        await btn.click(timeout=3000)
+                        print(f"  「{btn_text}」ボタンをクリックしました")
+                        await asyncio.sleep(3)
+                        break
+                except Exception:
+                    continue
+            landed_on_unexpected_page = "search_cookie" in page.url or "estate" not in page.url
+            if not landed_on_unexpected_page:
+                print(f"  → ボタン操作後に想定通りのページへ遷移しました: {page.url[:60]}")
+                area_rooms = await page.evaluate(EXTRACT_ROOMS_JS)
+                print(f"  エリア絞り込み後: {len(area_rooms)}件")
+                break
+
             if attempt < MAX_ATTEMPTS:
                 print(f"  ⚠ 想定外ページに遷移（{page.url[:60]}）"
                       f"（試行{attempt}/{MAX_ATTEMPTS}）→ 都道府県・市区町村選択からやり直します")
