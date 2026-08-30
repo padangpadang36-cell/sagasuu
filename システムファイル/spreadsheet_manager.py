@@ -13,8 +13,15 @@ import sys
 import io
 import re
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional
+
+# 本番環境（Railway等）はUTCで動作するため、常に日本時間に変換して使用する
+JST = timezone(timedelta(hours=9))
+
+
+def jst_now() -> datetime:
+    return datetime.now(JST)
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -630,7 +637,7 @@ def update_spreadsheet(
 
     # ファイル名（既に「_完成版_*」が付いている場合は除去してから付け直す）
     stem = re.sub(r'_完成版_\d{8}_\d{6}.*$', '', xlsx_path.stem)
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = jst_now().strftime('%Y%m%d_%H%M%S')
     out_path = kansei_dir / f"{stem}_完成版_{timestamp}.xlsx"
     wb.save(str(out_path))
     print(f"  スプレッドシート保存: 入力データ/完成版/{out_path.name}")
@@ -751,7 +758,7 @@ def append_to_case_database(row: dict, db_path: Path) -> None:
     area = row.get('希望エリア') or ''
 
     values = {
-        '処理日時':        datetime.now().strftime('%Y/%m/%d %H:%M'),
+        '処理日時':        jst_now().strftime('%Y/%m/%d %H:%M'),
         '案件ID':          case_id,
         '進捗ID':          shinkoku,
         '氏名':            row.get('氏名', ''),

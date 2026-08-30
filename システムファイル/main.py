@@ -10,7 +10,14 @@ import asyncio
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# 本番環境（Railway等）はUTCで動作するため、常に日本時間に変換して使用する
+JST = timezone(timedelta(hours=9))
+
+
+def jst_now() -> datetime:
+    return datetime.now(JST)
 
 # Windows コンソールの文字化け対策
 if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
@@ -1836,9 +1843,12 @@ async def download_droom_bulk_pdf(page, out_dir: Path, max_props: int = 30) -> s
         return ""
 
     # 一括ダウンロードボタンをクリック → PDF ダウンロードを待機
+    # 選択件数が多いとサーバー側のPDF生成に時間がかかるため長めに待つ
     try:
-        async with page.expect_download(timeout=90000) as dl_info:
-            await page.locator('#btn-yikkatudownload').click()
+        dl_btn = page.locator('#btn-yikkatudownload')
+        await dl_btn.wait_for(state="visible", timeout=10000)
+        async with page.expect_download(timeout=180000) as dl_info:
+            await dl_btn.click()
         dl = await dl_info.value
         fname = dl.suggested_filename or "D-Room一括出力.pdf"
         save_path = str(out_dir / fname)
@@ -2765,7 +2775,7 @@ def generate_pdf(case: dict, properties: list[dict], map_shots: dict,
     # フッター
     c.setFont(font_name, 8)
     c.setFillColor(colors.grey)
-    ts = datetime.now().strftime("%Y年%m月%d日 %H:%M 作成")
+    ts = jst_now().strftime("%Y年%m月%d日 %H:%M 作成")
     c.drawString(M, 10 * mm, ts)
 
     c.save()

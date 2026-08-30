@@ -13,9 +13,17 @@ import re
 import sys
 import subprocess
 import time
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import streamlit as st
+
+# ── タイムゾーン（本番環境はUTCのため常に日本時間に変換して表示）───
+JST = timezone(timedelta(hours=9))
+
+
+def jst_strftime(unix_time: float, fmt: str = "%Y/%m/%d %H:%M") -> str:
+    return datetime.fromtimestamp(unix_time, JST).strftime(fmt)
 
 # ── パス設定 ────────────────────────────────────────────────
 BASE_DIR   = Path(__file__).parent
@@ -484,7 +492,7 @@ with tab_mail:
 
         log_dir = BASE_DIR / "システムファイル" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
-        ts = time.strftime("%Y%m%d_%H%M%S")
+        ts = jst_strftime(time.time(), "%Y%m%d_%H%M%S")
         (log_dir / f"実行ログ_{ts}.txt").write_text("\n".join(log_lines), encoding="utf-8")
 
 # ══════════════════════════════════════════════════════════
@@ -525,7 +533,7 @@ if OUTPUT_DIR.exists():
 
         for case_dir in filtered:
             pdfs = sorted(case_dir.glob("*.pdf"))
-            mtime = time.strftime("%Y/%m/%d %H:%M", time.localtime(case_dir.stat().st_mtime))
+            mtime = jst_strftime(case_dir.stat().st_mtime)
             label = f"📂 {case_dir.name}　（PDF {len(pdfs)}件 ／ {mtime}）"
 
             with st.expander(label, expanded=False):
@@ -573,7 +581,7 @@ if KANSEI_DIR.exists():
     kansei_files = [f for f in kansei_files if not f.name.startswith("~$")]
     if kansei_files:
         for f in kansei_files[:10]:
-            mtime = time.strftime("%Y/%m/%d %H:%M", time.localtime(f.stat().st_mtime))
+            mtime = jst_strftime(f.stat().st_mtime)
             size_kb = f.stat().st_size // 1024
             st.markdown(f"📗 `{f.name}` &nbsp; {size_kb} KB &nbsp; {mtime}")
     else:
