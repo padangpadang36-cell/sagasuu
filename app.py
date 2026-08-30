@@ -25,6 +25,17 @@ PASTE_FILE = BASE_DIR / "メール貼り付け.txt"
 OUTPUT_DIR = BASE_DIR / "出力PDF"
 PIPELINE   = BASE_DIR / "システムファイル" / "pipeline.py"
 
+# ── 都道府県リスト ───────────────────────────────────────────
+PREF_LIST = [
+    "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+    "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+    "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県", "岐阜県",
+    "静岡県", "愛知県", "三重県", "滋賀県", "京都府", "大阪府", "兵庫県",
+    "奈良県", "和歌山県", "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+    "徳島県", "香川県", "愛媛県", "高知県", "福岡県", "佐賀県", "長崎県",
+    "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
+]
+
 # ── ページ設定 ───────────────────────────────────────────────
 st.set_page_config(
     page_title="社宅物件提案書 自動生成",
@@ -109,13 +120,30 @@ with tab_manual:
 
     with col_m1:
         st.markdown('<p class="section-label">検索条件</p>', unsafe_allow_html=True)
-        manual_area = st.text_input("エリア（市区町村）*", placeholder="例: 奥州市、盛岡市", key="manual_area")
+
+        area_pref_col, area_free_col = st.columns([1, 2])
+        with area_pref_col:
+            manual_area_pref = st.selectbox("都道府県*", ["選択してください"] + PREF_LIST, key="manual_area_pref")
+        with area_free_col:
+            manual_area_free = st.text_input("エリア（市区町村・自由入力）*", placeholder="例: 奥州市、盛岡市",
+                                             key="manual_area_free")
+
         manual_rent = st.number_input("家賃上限（円）*", min_value=0, max_value=500000,
                                       value=80000, step=5000, key="manual_rent")
-        manual_work_addr = st.text_input("勤務先住所（任意）", placeholder="例: 岩手県奥州市上田字先達沢12-1",
-                                         key="manual_work_addr")
+
+        work_pref_col, work_free_col = st.columns([1, 2])
+        with work_pref_col:
+            manual_work_pref = st.selectbox("勤務先 都道府県（任意）", ["選択してください"] + PREF_LIST,
+                                            key="manual_work_pref")
+        with work_free_col:
+            manual_work_addr_free = st.text_input("勤務先住所（任意・自由入力）", placeholder="例: 奥州市上田字先達沢12-1",
+                                                   key="manual_work_addr_free")
+
         manual_layout = st.text_input("希望間取り（任意）", placeholder="例: 1K、1LDK", key="manual_layout")
         manual_commute = st.text_input("通勤方法（任意）", placeholder="例: 車、電車", key="manual_commute")
+
+        manual_area = (manual_area_pref if manual_area_pref != "選択してください" else "") + manual_area_free.strip()
+        manual_work_addr = (manual_work_pref if manual_work_pref != "選択してください" else "") + manual_work_addr_free.strip()
 
     with col_m2:
         st.markdown('<p class="section-label">検索サイト選択</p>', unsafe_allow_html=True)
@@ -130,9 +158,9 @@ with tab_manual:
         manual_name   = st.text_input("氏名", placeholder="例: 山田 太郎", key="manual_name")
         manual_anken  = st.text_input("案件ID", placeholder="例: 159869", key="manual_anken")
 
-    can_manual = bool(manual_area.strip()) and manual_rent > 0
+    can_manual = (manual_area_pref != "選択してください") and bool(manual_area_free.strip()) and manual_rent > 0
     if not can_manual:
-        st.warning("⚠️ エリアと家賃上限は必須です")
+        st.warning("⚠️ 都道府県・エリア（市区町村）・家賃上限は必須です")
 
     manual_btn = st.button("🔍 検索する", type="primary", disabled=not can_manual,
                            use_container_width=True, key="manual_btn")
@@ -188,6 +216,31 @@ with tab_manual:
             if proc_m.returncode == 0:
                 st.success(f"✅ 検索完了（所要時間: {int(elapsed_m // 60)}分{int(elapsed_m % 60)}秒）")
 
+                # __RESULT_JSON__ ブロックから物件一覧を取得して画面表示
+                full_log = "\n".join(log_lines_m)
+                m = re.search(r"__RESULT_JSON__\n(.*?)\n__RESULT_JSON_END__", full_log, re.S)
+                properties = []
+                if m:
+                    try:
+                        result_data = _json.loads(m.group(1))
+                        properties = result_data.get("properties", [])
+                    except Exception as e:
+                        st.warning(f"結果データの解析に失敗しました: {e}")
+
+                if properties:
+                    st.subheader(f"🏠 検索結果（{len(properties)}件）")
+                    table_rows = [{
+                        "サイト": p.get("source", ""),
+                        "物件名": p.get("name", ""),
+                        "家賃": p.get("rent", ""),
+                        "間取り": p.get("layout", ""),
+                        "面積": p.get("area", ""),
+                        "住所": p.get("address", ""),
+                    } for p in properties]
+                    st.dataframe(table_rows, use_container_width=True)
+                else:
+                    st.info("該当する物件が見つかりませんでした。")
+
                 # 生成されたPDF一覧とZIPダウンロード
                 case_id_safe = re.sub(r'[\\/:*?"<>|]', "_",
                                       manual_anken.strip() or "手動検索")
@@ -211,6 +264,8 @@ with tab_manual:
                             mime="application/zip",
                             key="manual_zip",
                         )
+                    elif properties:
+                        st.caption("※ 選択したサイトの一部はPDF出力に対応していません（対応: ATBB・東建）。上記の検索結果一覧をご確認ください。")
             else:
                 st.error("❌ 検索中にエラーが発生しました。ログを確認してください。")
 
