@@ -1151,6 +1151,61 @@ def merge_pdf_with_map_image(detail_pdf_path: str, map_img_path: str,
         return detail_pdf_path
 
 
+def append_labeled_maps_to_pdf(base_pdf_path: str, map_entries: list, out_path: str,
+                                font_name: str, commute_method: str = '',
+                                workplace: str = '') -> str:
+    """複数物件をまとめた一括PDF（D-Room等）の末尾に、物件ごとの通勤ルート
+    地図ページを追記する。map_entries は [(物件名, 地図PNGパス), ...] のリスト。
+    """
+    import io as _io
+    try:
+        W, H = A4
+        M = 15 * mm
+        writer = PdfWriter()
+
+        if base_pdf_path and os.path.exists(base_pdf_path):
+            for p in PdfReader(base_pdf_path).pages:
+                writer.add_page(p)
+
+        for prop_name, map_img_path in map_entries:
+            if not (map_img_path and os.path.exists(map_img_path)):
+                continue
+            header_parts = [f"通勤ルート地図　{prop_name}"]
+            if commute_method:
+                header_parts.append(f"（{commute_method}）")
+            if workplace:
+                short_wp = workplace[:30] + ('…' if len(workplace) > 30 else '')
+                header_parts.append(f"  勤務地: {short_wp}")
+            header_text = ''.join(header_parts)
+
+            map_buf = _io.BytesIO()
+            c = canvas.Canvas(map_buf, pagesize=A4)
+            c.setFont(font_name, 11)
+            c.setFillColor(colors.HexColor("#37474f"))
+            c.drawString(M, H - M, header_text)
+
+            img = Image.open(map_img_path)
+            iw, ih = img.size
+            max_w = W - 2 * M
+            max_h = H - 2 * M - 15 * mm
+            scale = min(max_w / iw, max_h / ih)
+            dw, dh = iw * scale, ih * scale
+            c.drawImage(map_img_path, M, H - M - 15 * mm - dh, width=dw, height=dh)
+            c.save()
+            map_buf.seek(0)
+            for p in PdfReader(map_buf).pages:
+                writer.add_page(p)
+
+        with open(out_path, 'wb') as f:
+            writer.write(f)
+        print(f"  ✓ 地図付きPDF保存（{len(map_entries)}件分）: {out_path}")
+        return out_path
+    except Exception as e:
+        print(f"  ⚠ 一括地図PDF合成エラー: {e}")
+        import traceback; traceback.print_exc()
+        return base_pdf_path
+
+
 async def login_homemate(page, shot_dir: Path) -> bool:
     """東建ルームサーチにログインしてtop.aspへ遷移する"""
     print("── 東建ルームサーチにログイン中 ──")
@@ -2573,6 +2628,37 @@ async def _download_reabro_pdf_url(ctx_or_page, url: str, save_path: str) -> boo
         return False
 
 
+async def get_reabro_address(list_page, ctx, room_id: str, timeout: int = 15000) -> str:
+    """リアブロの物件一覧ページから go_detail() で物件詳細ページを開き、
+    「所在地」欄の住所を取得する。物件一覧のテーブル行自体には住所が
+    含まれておらず、また物件詳細PDF(factsheet.php)はCIDフォントの
+    エンコーディング問題でテキスト抽出できないため、詳細ページのHTMLから
+    直接読み取る。"""
+    detail_page = None
+    try:
+        # page.evaluate() でonclickハンドラを直接呼ぶとユーザー操作扱いされず
+        # ポップアップブロックで新規タブが開かないことがあるため、実際の
+        # リンク要素を本物のクリックとして操作する
+        link = list_page.locator(f'a[onclick*="\'{room_id}\'"]').first
+        async with ctx.expect_page(timeout=timeout) as new_page_info:
+            await link.click(timeout=timeout)
+        detail_page = await new_page_info.value
+        await detail_page.wait_for_load_state("domcontentloaded", timeout=timeout)
+        await asyncio.sleep(1.5)
+        text = await detail_page.evaluate("() => document.body.innerText")
+        m = re.search(r'所在地\s*(.+?)(?:地図を見る|\n)', text)
+        return m.group(1).strip() if m else ""
+    except Exception as e:
+        print(f"  ⚠ リアブロ住所取得エラー(id={room_id}): {e}")
+        return ""
+    finally:
+        try:
+            if detail_page and not detail_page.is_closed():
+                await detail_page.close()
+        except Exception:
+            pass
+
+
 async def download_reabro_pdfs(ctx, room_id: str, prop_name: str,
                                out_dir: Path, font_name: str,
                                map_img_path: str = "",
@@ -2721,6 +2807,21 @@ def clean_address_for_maps(addr: str) -> str:
     if not addr:
         return addr
     m = re.search(r'(JR|ＪＲ|[ぁ-んァ-ヶー一-龠]{2,8}線)', addr)
+    if m:
+        return addr[:m.start()].strip()
+    return addr.strip()
+
+
+def clean_droom_address(addr: str) -> str:
+    """D-Roomの住所文字列に駐車場代・契約条件などの説明文が連結されている
+    場合、それを除去する。
+    例: "千葉県鎌ケ谷市中央2-15-55 7,700円 先着順。仲介手数料１か月..."
+        → "千葉県鎌ケ谷市中央2-15-55"
+    （金額表記「○○円」の直前までを住所とみなす。区切りが無ければ何もしない）
+    """
+    if not addr:
+        return addr
+    m = re.search(r'\d[\d,，]*円', addr)
     if m:
         return addr[:m.start()].strip()
     return addr.strip()

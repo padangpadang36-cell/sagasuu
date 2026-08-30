@@ -49,7 +49,8 @@ from main import (
     login_homemate, search_homemate, extract_homemate_properties, download_homemate_detail_pdf,
     login_droom, search_droom, download_droom_bulk_pdf,
     search_leopalace, download_leopalace_pdf,
-    login_reabro, search_reabro, download_reabro_pdfs,
+    login_reabro, search_reabro, download_reabro_pdfs, get_reabro_address,
+    clean_droom_address, append_labeled_maps_to_pdf,
 )
 
 
@@ -214,6 +215,27 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                         if bulk_pdf:
                             bulk_pdf = _rename_output(bulk_pdf, case_id, "D-Room")
                             print(f"  D-Room 一括PDF: {Path(bulk_pdf).name}")
+
+                            # 勤務先住所がある場合、各物件から勤務先までの通勤ルート
+                            # 地図を取得し、一括PDFの末尾に物件ごとの地図ページとして追記する
+                            if map_page and work_address:
+                                map_entries = []
+                                for midx, mp in enumerate(props[:5]):
+                                    addr = clean_droom_address(mp.get('address', ''))
+                                    if not addr:
+                                        continue
+                                    mp['address'] = addr
+                                    map_png = str(shot_dir / f"map_droom_{midx}.png")
+                                    ok_map = await get_maps_screenshot(map_page, addr, work_address, map_png,
+                                                                       commute_method=commute)
+                                    if ok_map:
+                                        map_entries.append((mp.get('name', f'物件{midx+1}'), map_png))
+                                if map_entries:
+                                    merged_path = str(Path(bulk_pdf).with_name(
+                                        Path(bulk_pdf).stem + "_地図付き.pdf"))
+                                    bulk_pdf = append_labeled_maps_to_pdf(
+                                        bulk_pdf, map_entries, merged_path, font_name,
+                                        commute_method=commute, workplace=work_address)
                     all_props.extend(props)
                 await page.close()
             except Exception as e:
@@ -258,8 +280,12 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                         p['source'] = 'reabro'
                     for idx, rp in enumerate(props[:2]):
                         if rp.get('room_id'):
+                            # 一覧テーブルには住所が無いため、物件詳細ページから取得する
+                            addr = await get_reabro_address(page, ctx, rp['room_id'])
+                            if addr:
+                                rp['address'] = addr
+                                print(f"  リアブロ住所取得: {addr}")
                             map_png = ""
-                            addr = rp.get('address', '')
                             if map_page and work_address and addr:
                                 map_png = str(shot_dir / f"map_reabro_{idx}.png")
                                 ok_map = await get_maps_screenshot(map_page, addr, work_address, map_png,
