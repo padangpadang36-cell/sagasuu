@@ -39,6 +39,15 @@ DETAIL_DIR  = BASE_DIR / "出力PDF" / "物件詳細"
 
 load_dotenv(BASE_DIR / ".env")
 
+
+async def safe_screenshot(page, path: str, timeout: int = 8000) -> None:
+    """スクリーンショット取得（デバッグ用途）。タイムアウトしても処理を止めない。"""
+    try:
+        await page.screenshot(path=path, timeout=timeout)
+    except Exception:
+        pass
+
+
 # ─── ATBB 認証情報 ─────────────────────────────────────────
 ATBB_URL  = "https://atbb.athome.jp/"
 ATBB_ID   = os.getenv("ATBB_ID", "")
@@ -138,7 +147,7 @@ def read_requests(excel_path: Path) -> list[dict]:
 async def login_atbb(page, shot_dir: Path) -> bool:
     print("── ATBBにログイン中 ──")
     await page.goto(ATBB_URL, wait_until="domcontentloaded", timeout=30000)
-    await page.screenshot(path=str(shot_dir / "01_top.png"))
+    await safe_screenshot(page, str(shot_dir / "01_top.png"))
 
     # ログインフォームを探す
     id_selectors = [
@@ -165,7 +174,7 @@ async def login_atbb(page, shot_dir: Path) -> bool:
 
     if not id_filled:
         print("  ⚠ ID入力フィールドが見つかりません")
-        await page.screenshot(path=str(shot_dir / "01_error_no_id_field.png"))
+        await safe_screenshot(page, str(shot_dir / "01_error_no_id_field.png"))
         return False
 
     pw_filled = False
@@ -184,7 +193,7 @@ async def login_atbb(page, shot_dir: Path) -> bool:
         print("  ⚠ パスワード入力フィールドが見つかりません")
         return False
 
-    await page.screenshot(path=str(shot_dir / "02_form_filled.png"))
+    await safe_screenshot(page, str(shot_dir / "02_form_filled.png"))
 
     # ログインボタン
     submit_selectors = [
@@ -213,7 +222,7 @@ async def login_atbb(page, shot_dir: Path) -> bool:
     except Exception:
         pass
 
-    await page.screenshot(path=str(shot_dir / "03_after_login.png"))
+    await safe_screenshot(page, str(shot_dir / "03_after_login.png"))
     print(f"  ログイン後URL: {page.url}")
 
     # ログイン失敗チェック（URLが変わらない場合）
@@ -237,7 +246,7 @@ async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir
         print("  ATBB: エリア未指定のため検索をスキップします")
         return [], page
 
-    await page.screenshot(path=str(shot_dir / "04_logged_in.png"))
+    await safe_screenshot(page, str(shot_dir / "04_logged_in.png"))
 
     properties = []
 
@@ -253,7 +262,7 @@ async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir
 
         # クリック直後にメニューが開く（Riot.jsコンポーネント）
         await asyncio.sleep(1)
-        await page.screenshot(path=str(shot_dir / "05_after_menu.png"))
+        await safe_screenshot(page, str(shot_dir / "05_after_menu.png"))
 
         # Step2: 「流通物件検索」をクリック（新規タブが開く可能性あり）
         try:
@@ -273,7 +282,7 @@ async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir
             await asyncio.sleep(2)
 
         await asyncio.sleep(2)
-        await page.screenshot(path=str(shot_dir / "05b_after_ryutsu_click.png"))
+        await safe_screenshot(page, str(shot_dir / "05b_after_ryutsu_click.png"))
         print(f"  クリック後URL: {page.url}")
 
         # 「他のユーザーがATBBを利用中」ページへの対応
@@ -318,7 +327,7 @@ async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir
                 except Exception:
                     pass
                 await asyncio.sleep(2)
-                await page.screenshot(path=str(shot_dir / "05c_after_force_login.png"))
+                await safe_screenshot(page, str(shot_dir / "05c_after_force_login.png"))
                 print(f"  強制ログイン後URL: {page.url}")
             except Exception as e:
                 print(f"  強制終了エラー: {e}")
@@ -329,12 +338,12 @@ async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir
         except Exception:
             pass
         await asyncio.sleep(2)
-        await page.screenshot(path=str(shot_dir / "06_ryutsu_search.png"))
+        await safe_screenshot(page, str(shot_dir / "06_ryutsu_search.png"))
         print(f"  流通物件検索URL: {page.url}")
 
         # ATBBの検索フォームを操作
         await asyncio.sleep(2)
-        await page.screenshot(path=str(shot_dir / "06_ryutsu_search.png"))
+        await safe_screenshot(page, str(shot_dir / "06_ryutsu_search.png"))
 
         # Step1: ラジオボタンとラベルのマッピングを確認
         radio_label_map = await page.evaluate("""
@@ -394,7 +403,7 @@ async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir
             except Exception:
                 pass
 
-        await page.screenshot(path=str(shot_dir / "07_chintai_selected.png"))
+        await safe_screenshot(page, str(shot_dir / "07_chintai_selected.png"))
         await asyncio.sleep(1)
 
         # Step2: フリーワード検索フィールドに条件を入力して検索
@@ -408,8 +417,15 @@ async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir
                 print(f"  フリーワード入力: {free_word}")
                 # フリーワード横の検索ボタン
                 fw_btn = page.locator('input[value="検索"]').last
+                await fw_btn.wait_for(state="visible", timeout=5000)
+                url_before_search = page.url
                 await fw_btn.click()
                 print("  フリーワード検索実行")
+                # URL遷移 or DOM更新を最大10秒ポーリング待機
+                for _ in range(10):
+                    await asyncio.sleep(1)
+                    if page.url != url_before_search:
+                        break
             else:
                 raise Exception("フリーワードフィールドが見つかりません")
         except Exception as e:
@@ -443,14 +459,25 @@ async def search_atbb(page, ctx, area: str, rent_max: int, layout: str, shot_dir
         except Exception:
             pass
         await asyncio.sleep(2)
-        await page.screenshot(path=str(shot_dir / "08_search_results.png"))
+        await safe_screenshot(page, str(shot_dir / "08_search_results.png"))
         print(f"  検索結果URL: {page.url}")
+
+        # reCAPTCHA検知（ATBBの連続アクセスでBOT対策が作動する場合がある）
+        try:
+            captcha_visible = await page.evaluate("""
+                () => !!document.querySelector('iframe[src*="recaptcha"], iframe[title*="ロボット"], .g-recaptcha')
+            """)
+            if captcha_visible:
+                print("  ⚠ reCAPTCHA検出: ATBBのBOT対策が作動しました。短時間の連続アクセスを避けて時間を置いて再実行してください。")
+                return [], page
+        except Exception:
+            pass
 
         properties = await extract_properties(page, ctx, shot_dir)
 
     except Exception as e:
         print(f"  ⚠ 検索エラー: {e}")
-        await page.screenshot(path=str(shot_dir / "search_error.png"))
+        await safe_screenshot(page, str(shot_dir / "search_error.png"))
 
     return properties, page
 
@@ -504,43 +531,24 @@ def _parse_age_years(age_str: str) -> int | None:
 def filter_properties(
     props: list[dict],
     rent_max: int,
-    max_age_years: int = 20,
+    max_age_years: int = None,
 ) -> list[dict]:
     """
-    物件リストから不適切な物件を除外する。
+    物件リストを並べ替えて返す（除外なし）。
 
-    除外条件:
-    ① 家賃が低すぎる: 上限家賃の30%未満、かつ10,000円未満
-       例: rent_max=100,000 → 30,000円未満の物件を除外
-    ② 築年数が古すぎる: max_age_years 年超の物件を除外（デフォルト20年）
-       ※ 築年数情報がない物件は除外しない
+    並び順（優先度順）:
+    ① 家賃が上限に近い順（差額が小さい順）。家賃不明の物件は末尾。
+    ② 家賃が同じ場合は築年数が新しい順。築年数不明は末尾。
     """
-    min_rent = max(10_000, int(rent_max * 0.30))
-    filtered = []
-    for p in props:
-        name_short = p.get('name', '不明')[:25]
-        rent_str = p.get('rent', '')
-        rent_yen = _parse_rent_yen(rent_str)
+    def _sort_key(p):
+        rent_yen = _parse_rent_yen(p.get('rent', ''))
+        age = _parse_age_years(p.get('age', ''))
+        rent_diff = abs(rent_max - rent_yen) if rent_yen is not None else 10_000_000
+        age_val   = age if age is not None else 9999
+        return (rent_diff, age_val)
 
-        # ① 家賃チェック
-        if rent_yen is not None and rent_yen < min_rent:
-            min_man = min_rent // 10000
-            print(f"  [フィルタ除外] {name_short}: 家賃{rent_str} → {rent_yen:,}円 < 下限{min_man}万円")
-            continue
-
-        # ② 築年数チェック
-        age_str = p.get('age', '')
-        age_years = _parse_age_years(age_str)
-        if age_years is not None and age_years > max_age_years:
-            print(f"  [フィルタ除外] {name_short}: {age_str} → {age_years}年 > 上限{max_age_years}年")
-            continue
-
-        filtered.append(p)
-
-    removed = len(props) - len(filtered)
-    if removed:
-        print(f"  フィルタ結果: {len(props)}件 → {len(filtered)}件（{removed}件除外）")
-    return filtered
+    sorted_props = sorted(props, key=_sort_key)
+    return sorted_props
 
 
 def decode_price_code(code: str) -> str:
@@ -657,18 +665,19 @@ async def get_rent_from_detail(page, ctx, prop_index: int, shot_dir: Path) -> st
         return ""
 
 
-async def get_floor_plan_image(page, ctx, prop_idx: int, shot_dir: Path) -> tuple[str, str]:
-    """ATBBの詳細ボタンをクリック→同一タブ遷移→物件写真/間取り図取得→戻る。(path, label)を返す"""
+async def get_floor_plan_image(page, ctx, prop_idx: int, shot_dir: Path) -> tuple[str, str, str]:
+    """ATBBの詳細ボタンをクリック→同一タブ遷移→物件写真/間取り図取得→戻る。(path, label, detail_url)を返す"""
     import urllib.request as _req
     out_path = str(shot_dir / f"madori_{prop_idx + 1}.png")
     photo_label = "物件写真"
+    detail_url = ""
     try:
         btn_exists = await page.evaluate(
             f"() => !!document.getElementById('shosai_{prop_idx}')"
         )
         if not btn_exists:
             print(f"  shosai_{prop_idx} が見つかりません（物件{prop_idx+1}）")
-            return "", photo_label
+            return "", photo_label, detail_url
 
         # クリック → 同一タブで詳細ページへ遷移
         await page.evaluate(f"document.getElementById('shosai_{prop_idx}').click()")
@@ -677,7 +686,8 @@ async def get_floor_plan_image(page, ctx, prop_idx: int, shot_dir: Path) -> tupl
         except Exception:
             pass
         await asyncio.sleep(3)
-        print(f"  詳細URL 物件{prop_idx+1}: {page.url}")
+        detail_url = page.url
+        print(f"  詳細URL 物件{prop_idx+1}: {detail_url}")
 
         # ネットワークが落ち着くまで待つ（AJAXコンテンツのため）
         try:
@@ -752,7 +762,7 @@ async def get_floor_plan_image(page, ctx, prop_idx: int, shot_dir: Path) -> tupl
             pass
         out_path = ""
 
-    return out_path, photo_label
+    return out_path, photo_label, detail_url
 
 
 # ══════════════════════════════════════════════════════════
@@ -791,15 +801,19 @@ async def download_atbb_print_pdf(page, ctx, playwright_instance,
     _on_response = None
 
     try:
-        # ─── ① shosai_N クリック → 詳細ページへ ───
-        btn_exists = await page.evaluate(
-            f"() => !!document.getElementById('shosai_{prop_idx}')")
-        if not btn_exists:
-            print(f"  shosai_{prop_idx} が見つかりません")
-            return ""
-
-        await page.evaluate(f"document.getElementById('shosai_{prop_idx}').click()")
-        await page.wait_for_load_state("domcontentloaded", timeout=20000)
+        # ─── ① 詳細ページへ遷移（写真取得時に保存したURLを優先。なければ shosai_N クリック）───
+        saved_detail_url = prop.get('detail_url', '')
+        if saved_detail_url:
+            print(f"  詳細URL直接遷移: {saved_detail_url[:70]}")
+            await page.goto(saved_detail_url, wait_until="domcontentloaded", timeout=30000)
+        else:
+            btn_exists = await page.evaluate(
+                f"() => !!document.getElementById('shosai_{prop_idx}')")
+            if not btn_exists:
+                print(f"  shosai_{prop_idx} が見つかりません（detail_urlも未保存）")
+                return ""
+            await page.evaluate(f"document.getElementById('shosai_{prop_idx}').click()")
+            await page.wait_for_load_state("domcontentloaded", timeout=20000)
         await asyncio.sleep(3)
         try:
             await page.wait_for_load_state("networkidle", timeout=8000)
@@ -1108,7 +1122,7 @@ async def login_homemate(page, shot_dir: Path) -> bool:
     print("── 東建ルームサーチにログイン中 ──")
     await page.goto(HM_URL, wait_until="domcontentloaded", timeout=30000)
     await asyncio.sleep(2)
-    await page.screenshot(path=str(shot_dir / "hm_01_top.png"))
+    await safe_screenshot(page, str(shot_dir / "hm_01_top.png"))
 
     try:
         await page.locator('input[name="id"]').fill(HM_ID)
@@ -1124,7 +1138,7 @@ async def login_homemate(page, shot_dir: Path) -> bool:
     except Exception:
         pass
     await asyncio.sleep(3)
-    await page.screenshot(path=str(shot_dir / "hm_02_after_login.png"))
+    await safe_screenshot(page, str(shot_dir / "hm_02_after_login.png"))
 
     if "top.asp" in page.url:
         print(f"  ✓ ログイン成功: {page.url}")
@@ -1182,13 +1196,17 @@ async def search_homemate(page, area: str, shot_dir: Path,
 
     if target_city_val:
         await page.select_option('select[name="citysb"]', target_city_val)
-        await asyncio.sleep(3)  # getCity() が走る
 
-        # ③ 区・町（seljiscd）選択
-        seljiscd_options = await page.evaluate("""
-            () => Array.from(document.querySelector('select[name="seljiscd"]').options)
-                .map(o => ({v: o.value, t: o.text.trim()}))
-        """)
+        # ③ 区・町（seljiscd）選択 — getCity() のAJAX完了を最大10秒ポーリング待機
+        seljiscd_options = []
+        for _ in range(10):
+            await asyncio.sleep(1)
+            seljiscd_options = await page.evaluate("""
+                () => Array.from(document.querySelector('select[name="seljiscd"]').options)
+                    .map(o => ({v: o.value, t: o.text.trim()}))
+            """)
+            if len(seljiscd_options) > 1:
+                break
         print(f"  区・町: {len(seljiscd_options)}件")
 
         target_ward_val = None
@@ -1224,7 +1242,7 @@ async def search_homemate(page, area: str, shot_dir: Path,
             """)
             await asyncio.sleep(1)
 
-    await page.screenshot(path=str(shot_dir / "hm_03_form_ready.png"))
+    await safe_screenshot(page, str(shot_dir / "hm_03_form_ready.png"))
 
     # ④ 検索実行
     await page.evaluate("""
@@ -1243,7 +1261,7 @@ async def search_homemate(page, area: str, shot_dir: Path,
     except Exception:
         pass
     await asyncio.sleep(4)
-    await page.screenshot(path=str(shot_dir / "hm_04_result.png"))
+    await safe_screenshot(page, str(shot_dir / "hm_04_result.png"))
     print(f"  検索結果URL: {page.url}")
     return True
 
@@ -1494,12 +1512,14 @@ async def extract_properties(page, ctx, shot_dir: Path) -> list[dict]:
             if not prop.get('rent'):
                 prop['rent'] = "要確認"
 
-        # 物件写真/間取り図を各詳細ページから取得
+        # 物件写真/間取り図を各詳細ページから取得（詳細URLも保存してPDF取得で再利用）
         print("  物件写真を取得中...")
         for i, prop in enumerate(properties):
-            madori_path, photo_label = await get_floor_plan_image(page, ctx, i, shot_dir)
+            madori_path, photo_label, detail_url = await get_floor_plan_image(page, ctx, i, shot_dir)
             prop['madori_path'] = madori_path
             prop['photo_label'] = photo_label
+            if detail_url:
+                prop['detail_url'] = detail_url
 
     except Exception as e:
         print(f"  ⚠ 抽出エラー: {e}")
@@ -1630,20 +1650,28 @@ async def login_droom(page, shot_dir: Path) -> bool:
     # 強制ログイン（別セッションが存在する場合）
     if "CheckLogin" in page.url:
         print("  強制ログイン処理中...")
-        try:
-            await page.locator('#forcepassword').fill(DROOM_PASS)
-        except Exception:
-            pass
-        try:
-            await page.locator('#forceloginok').click()
-        except Exception as e:
-            print(f"  ⚠ 強制ログインボタンエラー: {e}")
-            return False
-        try:
-            await page.wait_for_load_state("networkidle", timeout=15000)
-        except Exception:
-            pass
-        await asyncio.sleep(3)
+        for attempt in range(2):
+            try:
+                pw_field = page.locator('#forcepassword')
+                await pw_field.wait_for(state="visible", timeout=8000)
+                await pw_field.fill(DROOM_PASS)
+            except Exception as e:
+                print(f"  ⚠ 強制ログインパスワード入力エラー: {e}")
+            try:
+                ok_btn = page.locator('#forceloginok')
+                await ok_btn.wait_for(state="visible", timeout=8000)
+                await ok_btn.click()
+            except Exception as e:
+                print(f"  ⚠ 強制ログインボタンエラー: {e}")
+                return False
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
+            await asyncio.sleep(3)
+            if "CheckLogin" not in page.url:
+                break
+            print(f"  強制ログイン再試行 ({attempt+1}/2)")
 
     # お知らせページ → 「メニューに進む」クリック
     try:
@@ -1654,7 +1682,7 @@ async def login_droom(page, shot_dir: Path) -> bool:
     except Exception:
         pass
 
-    await page.screenshot(path=str(shot_dir / "dr_01_after_login.png"))
+    await safe_screenshot(page, str(shot_dir / "dr_01_after_login.png"))
     print(f"  D-Room ログイン後URL: {page.url}")
 
     if "login" in page.url.lower():
@@ -1706,7 +1734,7 @@ async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
         pass
     await asyncio.sleep(2)
 
-    await page.screenshot(path=str(shot_dir / "dr_02_search_result.png"))
+    await safe_screenshot(page, str(shot_dir / "dr_02_search_result.png"))
     print(f"  D-Room 検索結果URL: {page.url}")
 
     # 最大検索件数エラーを検出 → エリアで絞り込めなかった場合は空リストを返す
@@ -1853,7 +1881,10 @@ async def search_leopalace(page, area: str, rent_max: int, shot_dir: Path,
     pref_url = f"{LP_BASE}/search/chintai/area?prefectureCode={pref_code}"
     await page.goto(pref_url, wait_until="domcontentloaded", timeout=30000)
     await asyncio.sleep(4)
-    await page.screenshot(path=str(shot_dir / "lp_01_pref.png"))
+    try:
+        await page.screenshot(path=str(shot_dir / "lp_01_pref.png"), timeout=8000)
+    except Exception:
+        pass
 
     # エリア名でA linkを探す（例: "大阪市北区"）
     area_url = await page.evaluate(f"""
@@ -1875,7 +1906,10 @@ async def search_leopalace(page, area: str, rent_max: int, shot_dir: Path,
     # エリア物件一覧へ
     await page.goto(area_url, wait_until="domcontentloaded", timeout=30000)
     await asyncio.sleep(4)
-    await page.screenshot(path=str(shot_dir / "lp_02_area_list.png"))
+    try:
+        await page.screenshot(path=str(shot_dir / "lp_02_area_list.png"), timeout=8000)
+    except Exception:
+        pass
 
     # 家賃上限フィルタをセット（rentTo）
     # 値リスト: 20000,25000,...,80000,...
@@ -1906,7 +1940,10 @@ async def search_leopalace(page, area: str, rent_max: int, shot_dir: Path,
         if await search_btn.is_visible(timeout=5000):
             await search_btn.click()
             await asyncio.sleep(4)
-        await page.screenshot(path=str(shot_dir / "lp_03_results.png"))
+        try:
+            await page.screenshot(path=str(shot_dir / "lp_03_results.png"), timeout=8000)
+        except Exception:
+            pass
         print(f"  検索後URL: {page.url}")
     except Exception as e:
         print(f"  検索ボタンエラー: {e}")
@@ -2031,18 +2068,45 @@ async def login_reabro(page, shot_dir: Path) -> bool:
         print(f"  ⚠ リアブロ ログインフォームエラー: {e}")
         return False
 
+    # ログイン後のリダイレクト完了を最大20秒待つ
+    for _ in range(4):
+        try:
+            await page.wait_for_load_state("domcontentloaded", timeout=5000)
+        except Exception:
+            pass
+        await asyncio.sleep(1)
+        url_now = page.url
+        if "index.php" not in url_now and (
+            "main.php" in url_now or "estate" in url_now or "realnetpro" in url_now
+        ):
+            break
     try:
-        await page.wait_for_load_state("domcontentloaded", timeout=15000)
+        await page.screenshot(path=str(shot_dir / "rb_01_after_login.png"), timeout=8000)
     except Exception:
         pass
-    await asyncio.sleep(2)
-    await page.screenshot(path=str(shot_dir / "rb_01_after_login.png"))
     print(f"  リアブロ ログイン後URL: {page.url}")
 
     if "main.php" in page.url or "estate" in page.url or "realnetpro" in page.url:
         if "index.php" not in page.url:
             print("  ✓ リアブロ ログイン成功")
             return True
+    # ログインページのままの場合、ボタン再クリックを試みる
+    try:
+        btn = page.locator('button:has-text("ログイン")').first
+        if await btn.is_visible(timeout=2000):
+            await btn.click()
+            await asyncio.sleep(5)
+            try:
+                await page.wait_for_load_state("domcontentloaded", timeout=10000)
+            except Exception:
+                pass
+            print(f"  リアブロ 再ログイン後URL: {page.url}")
+            if "main.php" in page.url or "estate" in page.url or "realnetpro" in page.url:
+                if "index.php" not in page.url:
+                    print("  ✓ リアブロ ログイン成功（リトライ）")
+                    return True
+    except Exception:
+        pass
     print("  ⚠ リアブロ ログイン失敗")
     return False
 
@@ -2097,9 +2161,18 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
 
     # 建物一覧ページへ
     estate_url = REABRO_BASE_URL + "/main.php?method=estate&display=building"
-    await page.goto(estate_url, wait_until="networkidle", timeout=30000)
+    for attempt in range(2):
+        try:
+            await page.goto(estate_url, wait_until="domcontentloaded", timeout=30000)
+            break
+        except Exception as e:
+            print(f"  ⚠ 建物一覧遷移エラー({attempt+1}/2): {e}")
+            await asyncio.sleep(3)
     await asyncio.sleep(3)
-    await page.screenshot(path=str(shot_dir / "rb_02_estate_list.png"))
+    try:
+        await page.screenshot(path=str(shot_dir / "rb_02_estate_list.png"), timeout=8000)
+    except Exception:
+        pass
 
     # ── Step1: 所在地絞り込みモーダルで都道府県 → 市区町村を選択 ────
     #
@@ -2159,7 +2232,10 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                 await next_btn.first.click()
                 await asyncio.sleep(2)
                 print("  市区郡の設定へ進む クリック")
-            await page.screenshot(path=str(shot_dir / "rb_03_pref_clicked.png"))
+            try:
+                await page.screenshot(path=str(shot_dir / "rb_03_pref_clicked.png"), timeout=8000)
+            except Exception:
+                pass
 
             # E: step2 内で市区町村ラベルをクリック
             for city_query in [area, re.sub(r'[市区町村郡]$', '', area)]:
@@ -2199,7 +2275,10 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                 }
             """)
             await asyncio.sleep(1)
-            await page.screenshot(path=str(shot_dir / "rb_03b_city_selected.png"))
+            try:
+                await page.screenshot(path=str(shot_dir / "rb_03b_city_selected.png"), timeout=8000)
+            except Exception:
+                pass
 
         except Exception as e:
             print(f"  ⚠ 所在地選択エラー: {e}")
@@ -2250,7 +2329,10 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
         except Exception:
             pass
         await asyncio.sleep(4)
-        await page.screenshot(path=str(shot_dir / "rb_04_search_result.png"))
+        try:
+            await page.screenshot(path=str(shot_dir / "rb_04_search_result.png"), timeout=8000)
+        except Exception:
+            pass
         print(f"  検索実行後URL: {page.url}")
     except Exception as e:
         print(f"  ⚠ 検索ボタンエラー: {e}")
@@ -2867,8 +2949,8 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
             rp['source'] = 'reabro'
             rp['reabro_idx'] = idx2
 
-        # ⑥-a フィルタリング（家賃下限・築年数）
-        print(f"  ── 物件フィルタリング（家賃下限: 上限の30% / 築年数: 20年以内）──")
+        # ⑥-a 並べ替え（家賃が上限に近い順・同額なら築年数新しい順）
+        print(f"  ── 物件並べ替え（家賃が上限に近い順 / 同額なら築年数新しい順）──")
         atbb_props   = filter_properties(atbb_props,   rent_max)
         hm_props     = filter_properties(hm_props,     rent_max)
         droom_props  = filter_properties(droom_props,  rent_max)
@@ -3022,7 +3104,7 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
 
     except Exception as e:
         print(f"エラー: {e}")
-        await page.screenshot(path=str(shot_dir / "fatal_error.png"))
+        await safe_screenshot(page, str(shot_dir / "fatal_error.png"))
         await browser.close()
         raise
 
