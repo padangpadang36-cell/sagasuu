@@ -273,7 +273,7 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 rb_shot = shot_dir / "reabro"
                 rb_shot.mkdir(exist_ok=True)
                 if await login_reabro(page, rb_shot):
-                    props = await search_reabro(page, area, rent_max, rb_shot, work_address=work_address)
+                    props = await search_reabro(page, area, rent_max, rb_shot, work_address=work_address, ctx=ctx)
                     props = filter_properties(props, rent_max)
                     print(f"  リアブロ: {len(props)}件取得（フィルター後）")
                     for p in props:
