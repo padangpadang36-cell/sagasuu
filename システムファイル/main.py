@@ -2542,18 +2542,31 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
 
     # ── Step5: 結果取得 ───────────────────────────────────────
     # 稀に検索フォーム送信後に search_cookie.php 等の想定外ページ
-    # （セッション/クッキー確認の中間ページ）に着地することがあり、
-    # その場合は物件一覧ページへ改めて遷移してから結果を取得し直す
-    if "search_cookie" in page.url or "estate" not in page.url:
-        print(f"  ⚠ 想定外ページに遷移（{page.url[:60]}）→ 物件一覧ページへ再遷移")
+    # （セッション/クッキー確認の中間ページ）に着地することがある。
+    # この場合、単純に物件一覧ページ(estate_url)へ再遷移すると
+    # 都道府県・市区町村・家賃の絞り込みが一切反映されていない
+    # 「フィルタなしの汎用一覧（全国の最新物件）」が表示されてしまい、
+    # それを検索結果として誤って採用してしまう不具合があった
+    # （フィルタなし一覧は空にならないため、後段のキーワード検索
+    # フォールバックが発動せず、無関係な地域の物件が返っていた）。
+    # そのため、想定外ページに遷移した場合はページ遷移のみ行い、
+    # 抽出結果を強制的に空扱いにしてキーワード検索フォールバックに
+    # 必ず回すようにする。
+    landed_on_unexpected_page = "search_cookie" in page.url or "estate" not in page.url
+    if landed_on_unexpected_page:
+        print(f"  ⚠ 想定外ページに遷移（{page.url[:60]}）"
+              f"→ フィルタなし一覧を誤採用しないようキーワード検索に切り替えます")
         try:
             await page.goto(estate_url, wait_until="domcontentloaded", timeout=30000)
             await asyncio.sleep(3)
         except Exception as e:
             print(f"  ⚠ 再遷移エラー: {e}")
 
-    area_rooms = await page.evaluate(EXTRACT_ROOMS_JS)
-    print(f"  エリア絞り込み後: {len(area_rooms)}件")
+    if landed_on_unexpected_page:
+        area_rooms = []
+    else:
+        area_rooms = await page.evaluate(EXTRACT_ROOMS_JS)
+        print(f"  エリア絞り込み後: {len(area_rooms)}件")
 
     # 0件の場合はキーワード検索でフォールバック（表記ゆれ・都道府県名を除いた市区町村名で）
     keyword = normalize_place_name(strip_pref_prefix(area)) or area
