@@ -155,7 +155,7 @@ with tab_manual:
 
     with col_m2:
         st.markdown('<p class="section-label">検索サイト選択</p>', unsafe_allow_html=True)
-        site_atbb    = st.checkbox("ATBB（アットホーム業者向け）", value=True, key="site_atbb")
+        site_atbb    = st.checkbox("ATBB（アットホーム業者向け）", value=False, key="site_atbb")
         st.caption("⚠️ 連続検索するとBOT対策により一時的に利用できなくなる場合があります")
         site_hm      = st.checkbox("東建ルームサーチ", value=True, key="site_hm")
         site_droom   = st.checkbox("D-Room（大和リビング）", value=True, key="site_droom")
