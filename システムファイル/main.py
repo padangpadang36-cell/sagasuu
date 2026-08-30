@@ -2359,29 +2359,7 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
 
     # 建物一覧ページへ
     estate_url = REABRO_BASE_URL + "/main.php?method=estate&display=building"
-    for attempt in range(2):
-        try:
-            await page.goto(estate_url, wait_until="domcontentloaded", timeout=30000)
-            break
-        except Exception as e:
-            print(f"  ⚠ 建物一覧遷移エラー({attempt+1}/2): {e}")
-            await asyncio.sleep(3)
-    await asyncio.sleep(3)
-    try:
-        await page.screenshot(path=str(shot_dir / "rb_02_estate_list.png"), timeout=8000)
-    except Exception:
-        pass
 
-    # ── Step1: 所在地絞り込みモーダルで都道府県 → 市区町村を選択 ────
-    #
-    # 確認済みフロー (debug_reabro_step2.py で検証):
-    #   A. アコーディオンクリック → step2 (市区郡選択, デフォルト東京) が開く
-    #   B. step2 内の「都道府県の設定」(.step1_m_text) をクリック → step1 (都道府県) へ
-    #   C. label.one_pref[value=XX] をクリック → 都道府県を選択
-    #   D. .next_step_button.next_action をクリック → step2 (選択済み都道府県の市区郡)
-    #   E. step2 内で市区町村ラベルをクリック
-    #   F. ×とじる でモーダルを閉じる
-    # ─────────────────────────────────────────────────────────────
     # 都道府県コードはまずエリア指定自体から検出し、無ければ勤務地住所で補う
     target_pref_code = detect_prefecture(area) or None
     if not target_pref_code and work_address:
@@ -2390,183 +2368,210 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                 target_pref_code = code
                 break
 
+    # 検索フォーム送信後、稀に search_cookie.php 等の想定外ページ
+    # （セッション/クッキー確認の中間ページ）に着地することがある。
+    # 以前はこの場合に単純にestate_urlへ再遷移していたが、それは
+    # 都道府県・市区町村・家賃の絞り込みが一切反映されていない
+    # 「フィルタなしの汎用一覧」であり、中身が空でないため誤って
+    # 検索結果として採用してしまっていた。またキーワード検索は
+    # 建物名しか検索できず住所ベースの絞り込みの代わりにはならない
+    # ため、想定外ページに着地した場合は都道府県→市区町村選択から
+    # やり直す（最大2回試行）。
+    MAX_ATTEMPTS = 2
     city_selected = False
-    if target_pref_code:
-        try:
-            # A: アコーディオンを開く → step2 (東京のデフォルト) 表示
-            slide_btn = page.locator('.one_slide_search_box .click_menu').first
-            if await slide_btn.count() > 0:
-                await slide_btn.click()
-                await asyncio.sleep(2)
-                print("  所在地パネル(step2) opened")
+    area_rooms = []
 
-            # B: 「都道府県の設定」→ step1 を開く
-            await page.evaluate(
-                "() => { const el = document.querySelector('.step1_m_text'); if (el) el.click(); }"
-            )
-            await asyncio.sleep(1.5)
-
-            # C: 目標の都道府県ラベルをクリック（step1 で visible になる）
-            pref_label = page.locator(f'label.one_pref:has(input[value="{target_pref_code}"])')
-            pref_cnt = await pref_label.count()
-            if pref_cnt > 0:
-                await pref_label.first.click()
-                await asyncio.sleep(1.5)
-                print(f"  都道府県クリック: pref_code={target_pref_code}")
-            else:
-                # フォールバック: evaluate でラベルクリック
-                await page.evaluate(f"""
-                    () => {{
-                        const lbl = document.querySelector(
-                            'label.one_pref:has(input[value="{target_pref_code}"])');
-                        if (lbl) lbl.click();
-                    }}
-                """)
-                await asyncio.sleep(1.5)
-                print(f"  都道府県クリック(evaluate): pref_code={target_pref_code}")
-
-            # D: 「市区郡の設定へ進む」(.next_step_button.next_action) → step2 更新
-            next_btn = page.locator('.next_step_button.next_action')
-            if await next_btn.count() > 0:
-                await next_btn.first.click()
-                await asyncio.sleep(2)
-                print("  市区郡の設定へ進む クリック")
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        for goto_attempt in range(2):
             try:
-                await page.screenshot(path=str(shot_dir / "rb_03_pref_clicked.png"), timeout=8000)
-            except Exception:
-                pass
+                await page.goto(estate_url, wait_until="domcontentloaded", timeout=30000)
+                break
+            except Exception as e:
+                print(f"  ⚠ 建物一覧遷移エラー({goto_attempt+1}/2): {e}")
+                await asyncio.sleep(3)
+        await asyncio.sleep(3)
+        try:
+            await page.screenshot(path=str(shot_dir / "rb_02_estate_list.png"), timeout=8000)
+        except Exception:
+            pass
 
-            # E: step2 内で市区町村ラベルをクリック
-            # ラベルテキストは都道府県名を含まないため、先に都道府県名を除去する
-            # 「ヶ/ケ」等の表記ゆれを吸収するため、比較前に双方を正規化する
-            area_city = normalize_place_name(strip_pref_prefix(area))
-            for city_query in [area_city, re.sub(r'[市区町村郡]$', '', area_city)]:
-                found = await page.evaluate(f"""
-                    () => {{
-                        const norm = (s) => (s || '').replace(/ヶ/g, 'ケ').replace(/ヵ/g, 'カ');
-                        const target = "{city_query}";
-                        const s2 = document.querySelector('.step2.city_select.detail_select_box');
-                        const labels = Array.from(
-                            s2 ? s2.querySelectorAll('label') : document.querySelectorAll('label')
-                        );
-                        const lbl = labels.find(l => norm(l.textContent.trim()).includes(target));
-                        if (lbl) {{
-                            lbl.click();
-                            return {{found: true, text: lbl.textContent.trim().substring(0, 20)}};
+        # ── Step1: 所在地絞り込みモーダルで都道府県 → 市区町村を選択 ────
+        #
+        # 確認済みフロー (debug_reabro_step2.py で検証):
+        #   A. アコーディオンクリック → step2 (市区郡選択, デフォルト東京) が開く
+        #   B. step2 内の「都道府県の設定」(.step1_m_text) をクリック → step1 (都道府県) へ
+        #   C. label.one_pref[value=XX] をクリック → 都道府県を選択
+        #   D. .next_step_button.next_action をクリック → step2 (選択済み都道府県の市区郡)
+        #   E. step2 内で市区町村ラベルをクリック
+        #   F. ×とじる でモーダルを閉じる
+        # ─────────────────────────────────────────────────────────────
+        city_selected = False
+        if target_pref_code:
+            try:
+                # A: アコーディオンを開く → step2 (東京のデフォルト) 表示
+                slide_btn = page.locator('.one_slide_search_box .click_menu').first
+                if await slide_btn.count() > 0:
+                    await slide_btn.click()
+                    await asyncio.sleep(2)
+                    print("  所在地パネル(step2) opened")
+
+                # B: 「都道府県の設定」→ step1 を開く
+                await page.evaluate(
+                    "() => { const el = document.querySelector('.step1_m_text'); if (el) el.click(); }"
+                )
+                await asyncio.sleep(1.5)
+
+                # C: 目標の都道府県ラベルをクリック（step1 で visible になる）
+                pref_label = page.locator(f'label.one_pref:has(input[value="{target_pref_code}"])')
+                pref_cnt = await pref_label.count()
+                if pref_cnt > 0:
+                    await pref_label.first.click()
+                    await asyncio.sleep(1.5)
+                    print(f"  都道府県クリック: pref_code={target_pref_code}")
+                else:
+                    # フォールバック: evaluate でラベルクリック
+                    await page.evaluate(f"""
+                        () => {{
+                            const lbl = document.querySelector(
+                                'label.one_pref:has(input[value="{target_pref_code}"])');
+                            if (lbl) lbl.click();
                         }}
-                        return {{found: false}};
-                    }}
+                    """)
+                    await asyncio.sleep(1.5)
+                    print(f"  都道府県クリック(evaluate): pref_code={target_pref_code}")
+
+                # D: 「市区郡の設定へ進む」(.next_step_button.next_action) → step2 更新
+                next_btn = page.locator('.next_step_button.next_action')
+                if await next_btn.count() > 0:
+                    await next_btn.first.click()
+                    await asyncio.sleep(2)
+                    print("  市区郡の設定へ進む クリック")
+                try:
+                    await page.screenshot(path=str(shot_dir / "rb_03_pref_clicked.png"), timeout=8000)
+                except Exception:
+                    pass
+
+                # E: step2 内で市区町村ラベルをクリック
+                # ラベルテキストは都道府県名を含まないため、先に都道府県名を除去する
+                # 「ヶ/ケ」等の表記ゆれを吸収するため、比較前に双方を正規化する
+                area_city = normalize_place_name(strip_pref_prefix(area))
+                for city_query in [area_city, re.sub(r'[市区町村郡]$', '', area_city)]:
+                    found = await page.evaluate(f"""
+                        () => {{
+                            const norm = (s) => (s || '').replace(/ヶ/g, 'ケ').replace(/ヵ/g, 'カ');
+                            const target = "{city_query}";
+                            const s2 = document.querySelector('.step2.city_select.detail_select_box');
+                            const labels = Array.from(
+                                s2 ? s2.querySelectorAll('label') : document.querySelectorAll('label')
+                            );
+                            const lbl = labels.find(l => norm(l.textContent.trim()).includes(target));
+                            if (lbl) {{
+                                lbl.click();
+                                return {{found: true, text: lbl.textContent.trim().substring(0, 20)}};
+                            }}
+                            return {{found: false}};
+                        }}
+                    """)
+                    if found.get('found'):
+                        city_selected = True
+                        await asyncio.sleep(1)
+                        print(f"  都市選択: {found['text']}")
+                        break
+
+                if not city_selected:
+                    print(f"  ⚠ 都市 '{area}' のラベルが見つかりません（都道府県全体で検索します）")
+
+                # F: ×とじる でモーダルを閉じる
+                await page.evaluate("""
+                    () => {
+                        const spans = Array.from(document.querySelectorAll('span'));
+                        const close = spans.find(s =>
+                            s.textContent.trim() === '×とじる' &&
+                            s.getBoundingClientRect().width > 0
+                        );
+                        if (close) close.click();
+                    }
                 """)
-                if found.get('found'):
-                    city_selected = True
-                    await asyncio.sleep(1)
-                    print(f"  都市選択: {found['text']}")
-                    break
+                await asyncio.sleep(1)
+                try:
+                    await page.screenshot(path=str(shot_dir / "rb_03b_city_selected.png"), timeout=8000)
+                except Exception:
+                    pass
 
-            if not city_selected:
-                print(f"  ⚠ 都市 '{area}' のラベルが見つかりません（都道府県全体で検索します）")
+            except Exception as e:
+                print(f"  ⚠ 所在地選択エラー: {e}")
 
-            # F: ×とじる でモーダルを閉じる
-            await page.evaluate("""
+        # ── Step3: 家賃上限を設定 ────────────────────────────────
+        RENT_STEPS = [
+            20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000,
+            60000, 65000, 70000, 75000, 80000, 85000, 90000, 95000,
+            100000, 110000, 120000, 130000, 140000, 150000,
+            160000, 170000, 180000, 190000, 200000,
+        ]
+        best_rent_val = '-1'  # 上限なし
+        for v in RENT_STEPS:
+            if v <= rent_max:
+                best_rent_val = str(v)
+        try:
+            await page.select_option('select[name="rental_cost2"]', best_rent_val)
+            disp = f'{int(best_rent_val)//10000}万円' if best_rent_val != '-1' else '上限なし'
+            print(f"  家賃上限設定: {disp}（rent_max={rent_max}円）")
+        except Exception as e:
+            print(f"  ⚠ 家賃上限設定エラー: {e}")
+
+        # ── Step4: 検索ボタンをクリック ───────────────────────────
+        try:
+            # まず visible な 検索ボタンを evaluate で探してクリック
+            clicked_search = await page.evaluate("""
                 () => {
-                    const spans = Array.from(document.querySelectorAll('span'));
-                    const close = spans.find(s =>
-                        s.textContent.trim() === '×とじる' &&
-                        s.getBoundingClientRect().width > 0
+                    const candidates = Array.from(
+                        document.querySelectorAll('button, input[type="button"], input[type="submit"]')
                     );
-                    if (close) close.click();
+                    const btn = candidates.find(el => {
+                        const t = (el.innerText || el.value || '').trim();
+                        const r = el.getBoundingClientRect();
+                        return t === '検索' && r.width > 0 && r.height > 0;
+                    });
+                    if (btn) { btn.click(); return true; }
+                    return false;
                 }
             """)
-            await asyncio.sleep(1)
+            if not clicked_search:
+                # フォールバック: フォームを直接 submit
+                await page.evaluate(
+                    "() => { document.getElementById('main_form')?.submit(); }"
+                )
+                print("  検索: フォーム submit (fallback)")
             try:
-                await page.screenshot(path=str(shot_dir / "rb_03b_city_selected.png"), timeout=8000)
+                await page.wait_for_load_state("networkidle", timeout=12000)
             except Exception:
                 pass
-
+            await asyncio.sleep(4)
+            try:
+                await page.screenshot(path=str(shot_dir / "rb_04_search_result.png"), timeout=8000)
+            except Exception:
+                pass
+            print(f"  検索実行後URL: {page.url}")
         except Exception as e:
-            print(f"  ⚠ 所在地選択エラー: {e}")
+            print(f"  ⚠ 検索ボタンエラー: {e}")
 
-    # ── Step3: 家賃上限を設定 ────────────────────────────────
-    RENT_STEPS = [
-        20000, 25000, 30000, 35000, 40000, 45000, 50000, 55000,
-        60000, 65000, 70000, 75000, 80000, 85000, 90000, 95000,
-        100000, 110000, 120000, 130000, 140000, 150000,
-        160000, 170000, 180000, 190000, 200000,
-    ]
-    best_rent_val = '-1'  # 上限なし
-    for v in RENT_STEPS:
-        if v <= rent_max:
-            best_rent_val = str(v)
-    try:
-        await page.select_option('select[name="rental_cost2"]', best_rent_val)
-        disp = f'{int(best_rent_val)//10000}万円' if best_rent_val != '-1' else '上限なし'
-        print(f"  家賃上限設定: {disp}（rent_max={rent_max}円）")
-    except Exception as e:
-        print(f"  ⚠ 家賃上限設定エラー: {e}")
+        # ── Step5: 結果取得 ───────────────────────────────────────
+        landed_on_unexpected_page = "search_cookie" in page.url or "estate" not in page.url
+        if landed_on_unexpected_page:
+            if attempt < MAX_ATTEMPTS:
+                print(f"  ⚠ 想定外ページに遷移（{page.url[:60]}）"
+                      f"（試行{attempt}/{MAX_ATTEMPTS}）→ 都道府県・市区町村選択からやり直します")
+                continue
+            else:
+                print(f"  ⚠ 想定外ページに遷移（{page.url[:60]}）"
+                      f"（試行{attempt}/{MAX_ATTEMPTS}、最終試行）"
+                      f"→ フィルタなし一覧を誤採用しないよう結果を空扱いにします")
+                area_rooms = []
+                break
 
-    # ── Step4: 検索ボタンをクリック ───────────────────────────
-    try:
-        # まず visible な 検索ボタンを evaluate で探してクリック
-        clicked_search = await page.evaluate("""
-            () => {
-                const candidates = Array.from(
-                    document.querySelectorAll('button, input[type="button"], input[type="submit"]')
-                );
-                const btn = candidates.find(el => {
-                    const t = (el.innerText || el.value || '').trim();
-                    const r = el.getBoundingClientRect();
-                    return t === '検索' && r.width > 0 && r.height > 0;
-                });
-                if (btn) { btn.click(); return true; }
-                return false;
-            }
-        """)
-        if not clicked_search:
-            # フォールバック: フォームを直接 submit
-            await page.evaluate(
-                "() => { document.getElementById('main_form')?.submit(); }"
-            )
-            print("  検索: フォーム submit (fallback)")
-        try:
-            await page.wait_for_load_state("networkidle", timeout=12000)
-        except Exception:
-            pass
-        await asyncio.sleep(4)
-        try:
-            await page.screenshot(path=str(shot_dir / "rb_04_search_result.png"), timeout=8000)
-        except Exception:
-            pass
-        print(f"  検索実行後URL: {page.url}")
-    except Exception as e:
-        print(f"  ⚠ 検索ボタンエラー: {e}")
-
-    # ── Step5: 結果取得 ───────────────────────────────────────
-    # 稀に検索フォーム送信後に search_cookie.php 等の想定外ページ
-    # （セッション/クッキー確認の中間ページ）に着地することがある。
-    # この場合、単純に物件一覧ページ(estate_url)へ再遷移すると
-    # 都道府県・市区町村・家賃の絞り込みが一切反映されていない
-    # 「フィルタなしの汎用一覧（全国の最新物件）」が表示されてしまい、
-    # それを検索結果として誤って採用してしまう不具合があった
-    # （フィルタなし一覧は空にならないため、後段のキーワード検索
-    # フォールバックが発動せず、無関係な地域の物件が返っていた）。
-    # そのため、想定外ページに遷移した場合はページ遷移のみ行い、
-    # 抽出結果を強制的に空扱いにしてキーワード検索フォールバックに
-    # 必ず回すようにする。
-    landed_on_unexpected_page = "search_cookie" in page.url or "estate" not in page.url
-    if landed_on_unexpected_page:
-        print(f"  ⚠ 想定外ページに遷移（{page.url[:60]}）"
-              f"→ フィルタなし一覧を誤採用しないようキーワード検索に切り替えます")
-        try:
-            await page.goto(estate_url, wait_until="domcontentloaded", timeout=30000)
-            await asyncio.sleep(3)
-        except Exception as e:
-            print(f"  ⚠ 再遷移エラー: {e}")
-
-    if landed_on_unexpected_page:
-        area_rooms = []
-    else:
         area_rooms = await page.evaluate(EXTRACT_ROOMS_JS)
         print(f"  エリア絞り込み後: {len(area_rooms)}件")
+        break
 
     # 0件の場合はキーワード検索でフォールバック（表記ゆれ・都道府県名を除いた市区町村名で）
     keyword = normalize_place_name(strip_pref_prefix(area)) or area
