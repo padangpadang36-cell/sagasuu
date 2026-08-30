@@ -2638,14 +2638,32 @@ async def get_reabro_address(list_page, ctx, room_id: str, timeout: int = 15000)
     try:
         # page.evaluate() でonclickハンドラを直接呼ぶとユーザー操作扱いされず
         # ポップアップブロックで新規タブが開かないことがあるため、実際の
-        # リンク要素を本物のクリックとして操作する
-        link = list_page.locator(f'a[onclick*="\'{room_id}\'"]').first
+        # リンク要素を本物のクリックとして操作する。
+        # onclickに同じroom_idを含む要素が複数存在する（画像等）ため、
+        # go_detail(...,'room_id','room') という完全一致パターンかつ
+        # class="room_number" を持つ要素だけに絞り込む
+        link = list_page.locator(
+            f'a.room_number[onclick*="go_detail(event,\'{room_id}\',\'room\')"]'
+        ).first
+        if await link.count() == 0:
+            link = list_page.locator(f'a[onclick*="\'{room_id}\'"]').first
         async with ctx.expect_page(timeout=timeout) as new_page_info:
             await link.click(timeout=timeout)
         detail_page = await new_page_info.value
         await detail_page.wait_for_load_state("domcontentloaded", timeout=timeout)
-        await asyncio.sleep(1.5)
-        text = await detail_page.evaluate("() => document.body.innerText")
+
+        # 新規タブのDOM構築が完了するまで待つ（body が null になることがある）
+        text = ""
+        for _ in range(6):
+            await asyncio.sleep(1)
+            try:
+                text = await detail_page.evaluate(
+                    "() => document.body ? document.body.innerText : ''"
+                )
+            except Exception:
+                text = ""
+            if text and "所在地" in text:
+                break
         m = re.search(r'所在地\s*(.+?)(?:地図を見る|\n)', text)
         return m.group(1).strip() if m else ""
     except Exception as e:
