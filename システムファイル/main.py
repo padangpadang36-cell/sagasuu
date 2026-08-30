@@ -95,6 +95,33 @@ PREF_CODE = {
 }
 
 
+def normalize_place_name(s: str) -> str:
+    """地名の表記ゆれ（鎌ヶ谷市/鎌ケ谷市 等の「ヶ」「ケ」「ヵ」「カ」）を統一する。
+    サイトによってどちらの表記を採用しているかが異なり、単純な文字列比較・
+    包含判定では一致しないことがあるため、比較前に必ずこれを通す。
+    """
+    if not s:
+        return s
+    return s.replace('ヶ', 'ケ').replace('ヵ', 'カ')
+
+
+def strip_pref_prefix(area: str) -> str:
+    """エリア文字列の先頭についた都道府県名を除去し、市区町村部分のみを返す。
+    各サイトの市区町村名マッチングは都道府県プレフィックスなしの文字列を
+    前提にしていることが多いため、都道府県セレクトボックス由来の
+    「都道府県名+市区町村」形式の文字列から都道府県名だけを取り除く。
+    """
+    if not area:
+        return area
+    for pref_name in sorted(PREF_CODE.keys(), key=len, reverse=True):
+        candidates = [pref_name] if pref_name.endswith(("都", "道", "府", "県")) else \
+            [pref_name + s for s in ("都", "道", "府", "県")]
+        for full in candidates:
+            if area.startswith(full):
+                return area[len(full):]
+    return area
+
+
 # ══════════════════════════════════════════════════════════
 #  ユーティリティ
 # ══════════════════════════════════════════════════════════
@@ -1185,21 +1212,23 @@ async def search_homemate(page, area: str, shot_dir: Path,
     """)
     print(f"  市グループ: {len(citysb_options)}件")
 
-    area_norm = _re.sub(r'[　\s]', '', area)
+    area_norm = normalize_place_name(_re.sub(r'[　\s]', '', area))
     target_city_val = None
     for o in citysb_options:
-        if o['t'] and o['t'] in area_norm:
+        if o['t'] and normalize_place_name(o['t']) in area_norm:
             target_city_val = o['v']
             print(f"  市選択: {o['t']} (value={o['v']})")
             break
 
     if not target_city_val and len(citysb_options) > 1:
-        # 先頭（空の選択肢を除く最初の実選択肢）
-        for o in citysb_options:
-            if o['v']:
-                target_city_val = o['v']
-                print(f"  市選択(先頭): {o['t']}")
-                break
+        # 「○○市の区から選択」のような政令指定都市限定グループは、
+        # そのものずばりの市名がエリア指定に含まれていない限り誤選択の
+        # 原因になるため除外し、汎用グループ（市から選択 等）を優先する
+        generic_opts = [o for o in citysb_options if o['v'] and 'の区から選択' not in o['t']]
+        candidates = generic_opts if generic_opts else [o for o in citysb_options if o['v']]
+        if candidates:
+            target_city_val = candidates[0]['v']
+            print(f"  市選択(先頭): {candidates[0]['t']}")
 
     if target_city_val:
         await page.select_option('select[name="citysb"]', target_city_val)
@@ -1218,7 +1247,7 @@ async def search_homemate(page, area: str, shot_dir: Path,
 
         target_ward_val = None
         for o in seljiscd_options:
-            if o['t'] and o['t'] in area_norm:
+            if o['t'] and normalize_place_name(o['t']) in area_norm:
                 target_ward_val = o['v']
                 print(f"  区選択: {o['t']} (value={o['v']})")
                 break
@@ -1723,10 +1752,11 @@ async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
     await page.goto(DROOM_ROOMLIST_URL, wait_until="domcontentloaded", timeout=20000)
     await asyncio.sleep(3)
 
-    # 住所入力
+    # 住所入力（「ヶ/ケ」等の表記ゆれがあるとD-Room側の住所検索が0件になるため正規化）
+    area_input = normalize_place_name(area)
     try:
-        await page.locator('input[name="address"]').fill(area)
-        print(f"  住所入力: {area}")
+        await page.locator('input[name="address"]').fill(area_input)
+        print(f"  住所入力: {area_input}")
     except Exception as e:
         print(f"  ⚠ 住所入力エラー: {e}")
 
@@ -1965,13 +1995,19 @@ async def search_leopalace(page, area: str, rent_max: int, shot_dir: Path,
     except Exception:
         pass
 
-    # エリア名でA linkを探す（例: "大阪市北区"）
+    # エリア名でA linkを探す（例: "大阪市北区"）。
+    # リンクテキストは都道府県名を含まない市区町村名のみのため、
+    # 都道府県セレクトボックス由来の「都道府県+市区町村」形式から
+    # 都道府県名を除いた市区町村名で照合する
+    # 「ヶ/ケ」等の表記ゆれを吸収するため、比較前に双方を正規化する
+    area_city = normalize_place_name(strip_pref_prefix(area))
     area_url = await page.evaluate(f"""
         () => {{
+            const norm = (s) => (s || '').trim().replace(/ヶ/g, 'ケ').replace(/ヵ/g, 'カ');
             const links = Array.from(document.querySelectorAll('a[href]'));
             const m = links.find(a =>
-                (a.innerText || '').trim() === '{area}' ||
-                (a.innerText || '').trim().startsWith('{area}')
+                norm(a.innerText) === '{area_city}' ||
+                norm(a.innerText).startsWith('{area_city}')
             );
             return m ? m.href : null;
         }}
@@ -1979,7 +2015,7 @@ async def search_leopalace(page, area: str, rent_max: int, shot_dir: Path,
     print(f"  エリアURL: {area_url}")
 
     if not area_url:
-        print(f"  ⚠ エリアURL見つからず: {area}")
+        print(f"  ⚠ エリアURL見つからず: {area_city}")
         return []
 
     # エリア物件一覧へ
@@ -2317,15 +2353,19 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                 pass
 
             # E: step2 内で市区町村ラベルをクリック
-            for city_query in [area, re.sub(r'[市区町村郡]$', '', area)]:
+            # ラベルテキストは都道府県名を含まないため、先に都道府県名を除去する
+            # 「ヶ/ケ」等の表記ゆれを吸収するため、比較前に双方を正規化する
+            area_city = normalize_place_name(strip_pref_prefix(area))
+            for city_query in [area_city, re.sub(r'[市区町村郡]$', '', area_city)]:
                 found = await page.evaluate(f"""
                     () => {{
+                        const norm = (s) => (s || '').replace(/ヶ/g, 'ケ').replace(/ヵ/g, 'カ');
                         const target = "{city_query}";
                         const s2 = document.querySelector('.step2.city_select.detail_select_box');
                         const labels = Array.from(
                             s2 ? s2.querySelectorAll('label') : document.querySelectorAll('label')
                         );
-                        const lbl = labels.find(l => l.textContent.trim().includes(target));
+                        const lbl = labels.find(l => norm(l.textContent.trim()).includes(target));
                         if (lbl) {{
                             lbl.click();
                             return {{found: true, text: lbl.textContent.trim().substring(0, 20)}};
