@@ -44,6 +44,7 @@ from main import (
     register_japanese_font,
     filter_properties,
     jst_now,
+    get_maps_screenshot, merge_pdf_with_map_image,
     login_atbb, search_atbb, download_atbb_print_pdf,
     login_homemate, search_homemate, extract_homemate_properties, download_homemate_detail_pdf,
     login_droom, search_droom, download_droom_bulk_pdf,
@@ -87,7 +88,7 @@ async def run_manual_search(params: dict):
         )
         try:
             await _run_all_sites(ctx, pw, sites, area, rent_max, layout,
-                                  work_address, shot_dir, case_dir, case_id, font_name, all_props)
+                                  work_address, commute, shot_dir, case_dir, case_id, font_name, all_props)
         finally:
             await browser.close()
 
@@ -118,8 +119,34 @@ def _rename_output(path: str, case_id: str, site_label: str) -> str:
         return path
 
 
+async def _attach_commute_map(map_page, work_address, commute, prop, pdf_path,
+                               case_dir, shot_dir, font_name, tag):
+    """物件住所→勤務先住所のGoogleマップ通勤ルートを取得し、PDFに合成する。
+    勤務先住所が未入力、または物件に住所が無い場合は何もせず元のPDFパスを返す。"""
+    if not work_address or not pdf_path:
+        return pdf_path
+    addr = prop.get('address', '')
+    if not addr:
+        return pdf_path
+    try:
+        map_png = str(shot_dir / f"map_{tag}.png")
+        ok = await get_maps_screenshot(map_page, addr, work_address, map_png,
+                                       commute_method=commute)
+        if not ok:
+            return pdf_path
+        merged_path = str(Path(pdf_path).with_name(Path(pdf_path).stem + "_地図付き.pdf"))
+        merge_pdf_with_map_image(pdf_path, map_png, merged_path, font_name,
+                                 commute_method=commute, workplace=work_address)
+        return merged_path
+    except Exception as e:
+        print(f"  ⚠ 地図合成エラー: {e}")
+        return pdf_path
+
+
 async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
-                          work_address, shot_dir, case_dir, case_id, font_name, all_props):
+                          work_address, commute, shot_dir, case_dir, case_id, font_name, all_props):
+        # 通勤ルート地図の取得専用ページ（サイトへのログイン不要）
+        map_page = await ctx.new_page() if work_address else None
         # ── ATBB ─────────────────────────────────────────────
         if "atbb" in sites or "ATBB" in sites:
             try:
@@ -135,6 +162,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                         dp = await download_atbb_print_pdf(page, ctx, pw, idx, props[idx], case_dir, font_name)
                         if dp:
                             dp = _rename_output(dp, case_id, "ATBB")
+                            dp = await _attach_commute_map(map_page, work_address, commute, props[idx], dp,
+                                                           case_dir, shot_dir, font_name, f"atbb_{idx}")
                             print(f"  ATBB PDF{idx+1}: {Path(dp).name}")
                     all_props.extend(props)
                 await page.close()
@@ -158,6 +187,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                                 dp = await download_homemate_detail_pdf(page, pw, hp['detail_href'], case_dir)
                                 if dp:
                                     dp = _rename_output(dp, case_id, "東建")
+                                    dp = await _attach_commute_map(map_page, work_address, commute, hp, dp,
+                                                                   case_dir, shot_dir, font_name, f"homemate_{idx}")
                                     print(f"  東建 PDF{idx+1}: {Path(dp).name}")
                         for p in props:
                             p['source'] = 'homemate'
@@ -205,6 +236,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                             page, pw, lp['detail_url'],
                             f"{case_id}_レオパレス_{lp.get('name', f'物件{idx+1}')}", case_dir)
                         if dp:
+                            dp = await _attach_commute_map(map_page, work_address, commute, lp, dp,
+                                                           case_dir, shot_dir, font_name, f"leopalace_{idx}")
                             print(f"  レオパレス PDF{idx+1}: {Path(dp).name}")
                 all_props.extend(props)
                 await page.close()
@@ -225,10 +258,19 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                         p['source'] = 'reabro'
                     for idx, rp in enumerate(props[:2]):
                         if rp.get('room_id'):
+                            map_png = ""
+                            addr = rp.get('address', '')
+                            if map_page and work_address and addr:
+                                map_png = str(shot_dir / f"map_reabro_{idx}.png")
+                                ok_map = await get_maps_screenshot(map_page, addr, work_address, map_png,
+                                                                   commute_method=commute)
+                                if not ok_map:
+                                    map_png = ""
                             pdfs = await download_reabro_pdfs(
                                 ctx, rp['room_id'],
                                 f"{case_id}_リアブロ_{rp.get('name', f'物件{idx+1}')}",
-                                case_dir, font_name)
+                                case_dir, font_name, map_png,
+                                commute_method=commute, workplace=work_address)
                             saved = [v for v in pdfs.values() if v]
                             if saved:
                                 print(f"  リアブロ PDF{idx+1}: {len(saved)}件保存")
@@ -236,6 +278,9 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 await page.close()
             except Exception as e:
                 print(f"  リアブロ エラー: {e}")
+
+        if map_page:
+            await map_page.close()
 
 
 def main():

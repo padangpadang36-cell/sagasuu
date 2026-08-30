@@ -2693,14 +2693,17 @@ def _commute_travel_mode(commute_method: str) -> str:
     自転車→bicycling / 電車・バス→transit / 車・自動車→driving / 徒歩→walking
     """
     m = commute_method or ''
-    if re.search(r'自転車|チャリ', m):
-        return 'bicycling'
-    if re.search(r'車|自動車|カー', m):
-        return 'driving'
-    if re.search(r'電車|バス|鉄道|公共', m):
-        return 'transit'
+    # 「車」は「電車」等の部分文字列としても一致してしまうため、
+    # より具体的なパターン（徒歩・自転車・電車/バス等）を先に判定し、
+    # 単独の「車」「自動車」は最後に判定する
     if re.search(r'徒歩|歩き', m):
         return 'walking'
+    if re.search(r'自転車|チャリ', m):
+        return 'bicycling'
+    if re.search(r'電車|バス|鉄道|公共|新幹線|地下鉄', m):
+        return 'transit'
+    if re.search(r'車|自動車|カー', m):
+        return 'driving'
     # デフォルト: 電車
     return 'transit'
 
