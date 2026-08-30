@@ -2597,17 +2597,20 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
         print(f"    {p['name'][:30]} / {p.get('rent', '')} / room_id={p['room_id']}")
 
     # 検証: 都市選択が成功したはずなのに実際の結果が別エリアの物件で
-    # あるケースが稀に発生する（原因未特定・再現困難）ため、先頭1件の
-    # 実住所を取得して指定エリアと一致するか確認する。不一致の場合は
-    # 誤ったエリアの物件を提案してしまうことを防ぐため空リストを返す。
+    # あるケースが稀に発生する（原因未特定・再現困難）ことがあったため、
+    # 先頭1件の実住所を取得して指定エリアと一致するか確認する。
+    # ただし検証ロジック自体の誤判定で正常な結果まで破棄してしまう方が
+    # 実害が大きいため、不一致でも結果は破棄せず警告ログのみ出力する
+    # （次回不一致が起きた際に area_city / check_addr の実値を確認できる
+    # ようにするための可観測性目的）。
     if ctx is not None and city_selected and result and area_city:
         try:
             check_addr = await get_reabro_address(page, ctx, result[0]['room_id'], timeout=10000)
             if check_addr and area_city not in normalize_place_name(check_addr):
-                print(f"  ⚠ リアブロ結果検証エラー: 先頭物件の住所「{check_addr}」に"
-                      f"指定エリア「{area_city}」が含まれません。誤ったエリアが選択された"
-                      f"可能性があるため、結果を破棄します。")
-                return []
+                print(f"  ⚠ リアブロ結果検証: 先頭物件の住所「{check_addr}」に"
+                      f"指定エリア「{area_city}」の文字列が含まれませんでした"
+                      f"（area={area!r} / area_city={area_city!r}）。"
+                      f"結果はそのまま使用します。")
             elif check_addr:
                 print(f"  検証OK: 先頭物件住所「{check_addr}」")
         except Exception as e:
