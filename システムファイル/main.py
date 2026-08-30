@@ -2606,7 +2606,9 @@ async def download_reabro_pdfs(ctx, room_id: str, prop_name: str,
     # ③ 社宅.com版 + 元図面 + 地図ページ をマージして合本PDF を生成
     pdfs_to_merge = [p for p in [result["syataku"], result["mototsuke"]] if p and os.path.exists(p)]
     if pdfs_to_merge:
-        merged_path = str(out_dir / f"{prop_safe}_地図付き.pdf")
+        has_map = bool(map_img_path and os.path.exists(map_img_path))
+        suffix = "地図付き" if has_map else "合本"
+        merged_path = str(out_dir / f"{prop_safe}_{suffix}.pdf")
         try:
             import io as _io
             writer = PdfWriter()
@@ -2708,6 +2710,22 @@ def _commute_travel_mode(commute_method: str) -> str:
     return 'transit'
 
 
+def clean_address_for_maps(addr: str) -> str:
+    """住所文字列に沿線名・駅名・徒歩時間が連結されている場合、それを除去して
+    Googleマップのジオコーディングが失敗しないようにする。
+    例: "水戸市河和田２丁目２２５３－９ＪＲ常磐線 赤塚駅まで車7分(2.1km)"
+        → "水戸市河和田２丁目２２５３－９"
+    （東建ルームサーチ等、住所と沿線情報が区切りなしで1つの文字列になっている
+    サイトの表記に対応するための処理。区切りが無い場合は何もしない。）
+    """
+    if not addr:
+        return addr
+    m = re.search(r'(JR|ＪＲ|[ぁ-んァ-ヶー一-龠]{2,8}線)', addr)
+    if m:
+        return addr[:m.start()].strip()
+    return addr.strip()
+
+
 async def get_maps_screenshot(page, from_addr: str, to_addr: str, out_path: str,
                                commute_method: str = '') -> bool:
     """
@@ -2721,6 +2739,7 @@ async def get_maps_screenshot(page, from_addr: str, to_addr: str, out_path: str,
     commute_method  : 通勤方法（自転車/電車/車 など）→ travelmode に自動変換
     """
     from urllib.parse import quote
+    from_addr = clean_address_for_maps(from_addr)
     travel_mode = _commute_travel_mode(commute_method)
     print(f"  地図取得: {from_addr[:30]} → {to_addr[:30]}  [{travel_mode}]")
     url = (
@@ -2751,6 +2770,14 @@ async def get_maps_screenshot(page, from_addr: str, to_addr: str, out_path: str,
         except Exception:
             pass
         await asyncio.sleep(3)
+
+        # 住所が見つからずジオコーディングに失敗した場合、Googleマップは
+        # 無関係な地域（初期表示位置）を表示するだけになるため、
+        # エラーメッセージが出ていないか確認し、出ていれば保存しない
+        page_text = await page.evaluate("() => document.body.innerText")
+        if re.search(r'見つかりません|該当する結果が見つかりません', page_text):
+            print(f"    ⚠ 住所が見つかりませんでした（ジオコーディング失敗）: {from_addr[:40]}")
+            return False
 
         await page.screenshot(path=out_path, full_page=False)
         print(f"    ✓ 地図保存: {out_path}")
