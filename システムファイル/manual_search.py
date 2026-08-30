@@ -87,7 +87,7 @@ async def run_manual_search(params: dict):
         )
         try:
             await _run_all_sites(ctx, pw, sites, area, rent_max, layout,
-                                  work_address, shot_dir, case_dir, font_name, all_props)
+                                  work_address, shot_dir, case_dir, case_id, font_name, all_props)
         finally:
             await browser.close()
 
@@ -104,8 +104,22 @@ async def run_manual_search(params: dict):
     print(f"完了: 合計 {len(all_props)} 件")
 
 
+def _rename_output(path: str, case_id: str, site_label: str) -> str:
+    """出力PDFのファイル名を「{管理番号}_{サイト名}_元のファイル名」形式に統一する"""
+    if not path:
+        return path
+    p = Path(path)
+    new_name = f"{case_id}_{site_label}_{p.name}"
+    new_path = p.with_name(new_name)
+    try:
+        p.rename(new_path)
+        return str(new_path)
+    except Exception:
+        return path
+
+
 async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
-                          work_address, shot_dir, case_dir, font_name, all_props):
+                          work_address, shot_dir, case_dir, case_id, font_name, all_props):
         # ── ATBB ─────────────────────────────────────────────
         if "atbb" in sites or "ATBB" in sites:
             try:
@@ -120,6 +134,7 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                     for idx in range(min(len(props), 3)):
                         dp = await download_atbb_print_pdf(page, ctx, pw, idx, props[idx], case_dir, font_name)
                         if dp:
+                            dp = _rename_output(dp, case_id, "ATBB")
                             print(f"  ATBB PDF{idx+1}: {Path(dp).name}")
                     all_props.extend(props)
                 await page.close()
@@ -142,7 +157,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                             if hp.get('detail_href'):
                                 dp = await download_homemate_detail_pdf(page, pw, hp['detail_href'], case_dir)
                                 if dp:
-                                    print(f"  東建 PDF{idx+1}: {dp}")
+                                    dp = _rename_output(dp, case_id, "東建")
+                                    print(f"  東建 PDF{idx+1}: {Path(dp).name}")
                         for p in props:
                             p['source'] = 'homemate'
                         all_props.extend(props)
@@ -165,6 +181,7 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                     if props:
                         bulk_pdf = await download_droom_bulk_pdf(page, case_dir)
                         if bulk_pdf:
+                            bulk_pdf = _rename_output(bulk_pdf, case_id, "D-Room")
                             print(f"  D-Room 一括PDF: {Path(bulk_pdf).name}")
                     all_props.extend(props)
                 await page.close()
@@ -186,7 +203,7 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                     if lp.get('detail_url'):
                         dp = await download_leopalace_pdf(
                             page, pw, lp['detail_url'],
-                            f"レオパレス_{lp.get('name', f'物件{idx+1}')}", case_dir)
+                            f"{case_id}_レオパレス_{lp.get('name', f'物件{idx+1}')}", case_dir)
                         if dp:
                             print(f"  レオパレス PDF{idx+1}: {Path(dp).name}")
                 all_props.extend(props)
@@ -210,7 +227,7 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                         if rp.get('room_id'):
                             pdfs = await download_reabro_pdfs(
                                 ctx, rp['room_id'],
-                                f"リアブロ_{rp.get('name', f'物件{idx+1}')}",
+                                f"{case_id}_リアブロ_{rp.get('name', f'物件{idx+1}')}",
                                 case_dir, font_name)
                             saved = [v for v in pdfs.values() if v]
                             if saved:

@@ -1658,24 +1658,36 @@ async def login_droom(page, shot_dir: Path) -> bool:
     if "CheckLogin" in page.url:
         print("  強制ログイン処理中...")
         for attempt in range(2):
+            # 前回試行のナビゲーションが遅れて完了することがあるため、
+            # フォーム操作前に念のため CheckLogin から抜けていないか再確認
+            if "CheckLogin" not in page.url:
+                break
             try:
                 pw_field = page.locator('#forcepassword')
                 await pw_field.wait_for(state="visible", timeout=8000)
                 await pw_field.fill(DROOM_PASS)
             except Exception as e:
+                if "CheckLogin" not in page.url:
+                    break
                 print(f"  ⚠ 強制ログインパスワード入力エラー: {e}")
             try:
                 ok_btn = page.locator('#forceloginok')
                 await ok_btn.wait_for(state="visible", timeout=8000)
                 await ok_btn.click()
             except Exception as e:
+                if "CheckLogin" not in page.url:
+                    break
                 print(f"  ⚠ 強制ログインボタンエラー: {e}")
                 return False
             try:
                 await page.wait_for_load_state("networkidle", timeout=15000)
             except Exception:
                 pass
-            await asyncio.sleep(3)
+            # ナビゲーション完了を最大10秒ポーリング待機してから判定する
+            for _ in range(10):
+                if "CheckLogin" not in page.url:
+                    break
+                await asyncio.sleep(1)
             if "CheckLogin" not in page.url:
                 break
             print(f"  強制ログイン再試行 ({attempt+1}/2)")
@@ -1815,20 +1827,29 @@ async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
     return props
 
 
-async def download_droom_bulk_pdf(page, out_dir: Path, max_props: int = 30) -> str:
+async def download_droom_bulk_pdf(page, out_dir: Path, max_props: int = 20) -> str:
+    # D-Room サイト側の仕様で一括出力は20件までに制限されている
     """D-Room の物件選択チェックボックスをONにしてDroomシート一括PDFをダウンロードする"""
     print("── D-Room Droomシート一括出力 ──")
 
     # 物件行チェックボックスのみを選択（フィルタ用CBは除外）
+    # チェックボックス自体は非表示のカスタムUIのため、Playwrightの
+    # 可視性チェックには失敗する。関連する<label>のDOM click()を呼ぶことで
+    # ブラウザ標準のクリック処理（フレームワーク側の状態更新も含む）を発火させる
     selected = await page.evaluate("""
         (maxProps) => {
+            const boxes = Array.from(document.querySelectorAll('input[type="checkbox"]'));
             let cnt = 0;
-            for (const cb of document.querySelectorAll('input[type="checkbox"]')) {
+            for (const cb of boxes) {
                 if (!cb.value || !cb.value.match(/^\\d{7,12}-\\d{3}/)) continue;
-                if (cb.disabled) continue;
-                cb.checked = true;
-                cb.dispatchEvent(new Event('change', { bubbles: true }));
-                cb.dispatchEvent(new Event('click',  { bubbles: true }));
+                if (cb.disabled || cb.checked) continue;
+                let label = cb.id ? document.querySelector('label[for="' + cb.id + '"]') : null;
+                if (!label) label = cb.closest('label');
+                if (label) {
+                    label.click();
+                } else {
+                    cb.click();
+                }
                 cnt++;
                 if (cnt >= maxProps) break;
             }
@@ -1842,14 +1863,62 @@ async def download_droom_bulk_pdf(page, out_dir: Path, max_props: int = 30) -> s
         print("  ⚠ 選択できる物件がありません")
         return ""
 
+    def _on_dialog(d):
+        asyncio.create_task(d.accept())
+    page.once("dialog", _on_dialog)
+
     # 一括ダウンロードボタンをクリック → PDF ダウンロードを待機
-    # 選択件数が多いとサーバー側のPDF生成に時間がかかるため長めに待つ
     try:
         dl_btn = page.locator('#btn-yikkatudownload')
         await dl_btn.wait_for(state="visible", timeout=10000)
-        async with page.expect_download(timeout=180000) as dl_info:
-            await dl_btn.click()
-        dl = await dl_info.value
+
+        new_page_task = asyncio.ensure_future(page.context.wait_for_event("page", timeout=60000))
+        download_task = asyncio.ensure_future(page.wait_for_event("download", timeout=60000))
+        await dl_btn.click()
+
+        # クリック直後、同一ページに「N件までです」等のエラーが表示されていないか確認
+        await asyncio.sleep(2)
+        try:
+            page_msg = await page.evaluate(
+                "() => document.body.innerText.includes('までです') ? "
+                "document.body.innerText.match(/[^\\n]*までです[^\\n]*/)?.[0] : null"
+            )
+            if page_msg:
+                new_page_task.cancel()
+                download_task.cancel()
+                print(f"  ⚠ D-Room一括出力エラー: {page_msg}")
+                return ""
+        except Exception:
+            pass
+
+        done, pending = await asyncio.wait(
+            [new_page_task, download_task], timeout=60, return_when=asyncio.FIRST_COMPLETED)
+        for t in pending:
+            t.cancel()
+
+        dl = None
+        if download_task in done and not download_task.cancelled() and download_task.exception() is None:
+            dl = download_task.result()
+        elif new_page_task in done and not new_page_task.cancelled() and new_page_task.exception() is None:
+            new_pg = new_page_task.result()
+            await new_pg.wait_for_load_state("domcontentloaded", timeout=15000)
+            print(f"  新規タブ検出: {new_pg.url[:80]}")
+            try:
+                async with new_pg.expect_download(timeout=15000) as dl_info2:
+                    pass
+                dl = await dl_info2.value
+            except Exception:
+                # ダウンロードイベントが来ない場合、タブ自体をPDF印刷して保存
+                fallback_path = str(out_dir / "D-Room一括出力.pdf")
+                await new_pg.pdf(path=fallback_path, format="A4", print_background=True)
+                await new_pg.close()
+                size = os.path.getsize(fallback_path)
+                print(f"  ✓ D-Room一括PDF(タブ印刷): {fallback_path} ({size:,} bytes)")
+                return fallback_path
+
+        if dl is None:
+            raise Exception("ダウンロード・新規タブのいずれも検出できませんでした")
+
         fname = dl.suggested_filename or "D-Room一括出力.pdf"
         save_path = str(out_dir / fname)
         await dl.save_as(save_path)
