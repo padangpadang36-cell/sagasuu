@@ -1214,6 +1214,7 @@ async def search_homemate(page, area: str, shot_dir: Path,
 
     area_norm = normalize_place_name(_re.sub(r'[　\s]', '', area))
     target_city_val = None
+    designated_city_name = None
     for o in citysb_options:
         if o['t'] and normalize_place_name(o['t']) in area_norm:
             target_city_val = o['v']
@@ -1227,10 +1228,12 @@ async def search_homemate(page, area: str, shot_dir: Path,
         # 市（グループの先頭市）を検索してしまうため除外し、
         # 汎用グループ（市から選択 等）を優先する。
         designated_match = None
+        designated_city_name = None
         for o in citysb_options:
             m = _re.match(r'^(.+市)の区から選択$', o['t'] or '')
             if m and normalize_place_name(m.group(1)) in area_norm:
                 designated_match = o
+                designated_city_name = normalize_place_name(m.group(1))
                 break
         if designated_match:
             target_city_val = designated_match['v']
@@ -1263,6 +1266,19 @@ async def search_homemate(page, area: str, shot_dir: Path,
                 target_ward_val = o['v']
                 print(f"  区選択: {o['t']} (value={o['v']})")
                 break
+
+        # 政令指定都市（大阪市・横浜市 等）で具体的な区名が指定されている場合、
+        # その区が一覧に無い（＝現在掲載物件が無い）ときに無関係な別の区へ
+        # フォールバックすると、指定と全く違うエリアの物件が返ってしまう。
+        # 区名が明示されているケースでは検索を打ち切り「該当なし」として扱う。
+        ward_explicitly_requested = False
+        if designated_city_name:
+            remainder = area_norm.replace(designated_city_name, '', 1)
+            ward_explicitly_requested = '区' in remainder
+
+        if not target_ward_val and ward_explicitly_requested:
+            print(f"  ⚠ 指定区が一覧に見つかりません（現在掲載物件なしの可能性）。無関係な区は検索しません: {area}")
+            return False
 
         if not target_ward_val and seljiscd_options:
             for o in seljiscd_options:
