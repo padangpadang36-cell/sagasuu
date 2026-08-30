@@ -2311,8 +2311,9 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
     #   E. step2 内で市区町村ラベルをクリック
     #   F. ×とじる でモーダルを閉じる
     # ─────────────────────────────────────────────────────────────
-    target_pref_code = None
-    if work_address:
+    # 都道府県コードはまずエリア指定自体から検出し、無ければ勤務地住所で補う
+    target_pref_code = detect_prefecture(area) or None
+    if not target_pref_code and work_address:
         for pref_name, code in PREF_CODE.items():
             if pref_name in work_address:
                 target_pref_code = code
@@ -2469,17 +2470,29 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
         print(f"  ⚠ 検索ボタンエラー: {e}")
 
     # ── Step5: 結果取得 ───────────────────────────────────────
+    # 稀に検索フォーム送信後に search_cookie.php 等の想定外ページ
+    # （セッション/クッキー確認の中間ページ）に着地することがあり、
+    # その場合は物件一覧ページへ改めて遷移してから結果を取得し直す
+    if "search_cookie" in page.url or "estate" not in page.url:
+        print(f"  ⚠ 想定外ページに遷移（{page.url[:60]}）→ 物件一覧ページへ再遷移")
+        try:
+            await page.goto(estate_url, wait_until="domcontentloaded", timeout=30000)
+            await asyncio.sleep(3)
+        except Exception as e:
+            print(f"  ⚠ 再遷移エラー: {e}")
+
     area_rooms = await page.evaluate(EXTRACT_ROOMS_JS)
     print(f"  エリア絞り込み後: {len(area_rooms)}件")
 
-    # 0件の場合はキーワード検索でフォールバック
-    if not area_rooms and area:
-        print(f"  → キーワード検索フォールバック: {area}")
+    # 0件の場合はキーワード検索でフォールバック（表記ゆれ・都道府県名を除いた市区町村名で）
+    keyword = normalize_place_name(strip_pref_prefix(area)) or area
+    if not area_rooms and keyword:
+        print(f"  → キーワード検索フォールバック: {keyword}")
         try:
             kw = page.locator('input[name="keyword"]').first
             if await kw.is_visible(timeout=2000):
                 await kw.click(click_count=3)
-                await kw.fill(area)
+                await kw.fill(keyword)
                 await kw.press("Enter")
                 try:
                     await page.wait_for_load_state("networkidle", timeout=10000)
@@ -2487,7 +2500,7 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                     pass
                 await asyncio.sleep(3)
                 area_rooms = await page.evaluate(EXTRACT_ROOMS_JS)
-                print(f"  キーワード検索({area}): {len(area_rooms)}件")
+                print(f"  キーワード検索({keyword}): {len(area_rooms)}件")
         except Exception as e:
             print(f"  キーワード検索エラー: {e}")
 
