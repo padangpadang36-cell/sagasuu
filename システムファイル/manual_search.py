@@ -144,6 +144,10 @@ async def _attach_commute_map(map_page, work_address, commute, prop, pdf_path,
         return pdf_path
 
 
+# 各サイトから提示する物件数の上限
+RESULT_LIMIT = 3
+
+
 async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                           work_address, commute, shot_dir, case_dir, case_id, font_name, all_props):
         # 通勤ルート地図の取得専用ページ（サイトへのログイン不要）
@@ -154,16 +158,20 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 page = await ctx.new_page()
                 if await login_atbb(page, shot_dir):
                     props, page = await search_atbb(page, ctx, area, rent_max, layout, shot_dir)
-                    props = filter_properties(props, rent_max)
-                    print(f"  ATBB: {len(props)}件取得（フィルター後）")
+                    # 絞り込みで並び順が変わる前に、ATBB一覧ページ上の行番号を
+                    # 保持しておく（PDF取得は shosai_{行番号} をクリックするため、
+                    # 並べ替え後の順番を渡すと別物件のPDFを取得してしまう）
                     for idx, p in enumerate(props):
                         p['source'] = 'atbb'
                         p['atbb_idx'] = idx
-                    for idx in range(min(len(props), 3)):
-                        dp = await download_atbb_print_pdf(page, ctx, pw, idx, props[idx], case_dir, font_name)
+                    props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
+                    print(f"  ATBB: {len(props)}件取得（フィルター後）")
+                    for idx, p in enumerate(props):
+                        dp = await download_atbb_print_pdf(page, ctx, pw, p.get('atbb_idx', idx),
+                                                           p, case_dir, font_name)
                         if dp:
                             dp = _rename_output(dp, case_id, "ATBB")
-                            dp = await _attach_commute_map(map_page, work_address, commute, props[idx], dp,
+                            dp = await _attach_commute_map(map_page, work_address, commute, p, dp,
                                                            case_dir, shot_dir, font_name, f"atbb_{idx}")
                             print(f"  ATBB PDF{idx+1}: {Path(dp).name}")
                     all_props.extend(props)
@@ -180,10 +188,15 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 if await login_homemate(page, hm_shot):
                     ok = await search_homemate(page, area, hm_shot, work_address=work_address)
                     if ok:
-                        props = await extract_homemate_properties(page, ctx, hm_shot)
-                        props = filter_properties(props, rent_max)
+                        # 一覧の全行を対象に「規定内・同一建物1件・上限に近い順」で
+                        # 絞り込む（以前は先頭3行を無条件に採用していたため、
+                        # 規定外の物件や同一建物の別号室ばかりが並んでいた）
+                        props = await extract_homemate_properties(
+                            page, ctx, hm_shot,
+                            rent_max=rent_max, limit=RESULT_LIMIT, area=area)
+                        props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
                         print(f"  東建: {len(props)}件取得（フィルター後）")
-                        for idx, hp in enumerate(props[:3]):
+                        for idx, hp in enumerate(props):
                             if hp.get('detail_href'):
                                 dp = await download_homemate_detail_pdf(page, pw, hp['detail_href'], case_dir)
                                 if dp:
@@ -206,12 +219,15 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 dr_shot.mkdir(exist_ok=True)
                 if await login_droom(page, dr_shot):
                     props = await search_droom(page, area, rent_max, dr_shot)
-                    props = filter_properties(props, rent_max)
+                    props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
                     print(f"  D-Room: {len(props)}件取得（フィルター後）")
                     for p in props:
                         p['source'] = 'droom'
                     if props:
-                        bulk_pdf = await download_droom_bulk_pdf(page, case_dir)
+                        # 提示対象（規定内・同一建物1件）の物件だけをPDF化する
+                        bulk_pdf = await download_droom_bulk_pdf(
+                            page, case_dir,
+                            room_ids=[p['room_id'] for p in props if p.get('room_id')])
                         if bulk_pdf:
                             bulk_pdf = _rename_output(bulk_pdf, case_id, "D-Room")
                             print(f"  D-Room 一括PDF: {Path(bulk_pdf).name}")
@@ -220,7 +236,7 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                             # 地図を取得し、一括PDFの末尾に物件ごとの地図ページとして追記する
                             if map_page and work_address:
                                 map_entries = []
-                                for midx, mp in enumerate(props[:5]):
+                                for midx, mp in enumerate(props):
                                     addr = clean_droom_address(mp.get('address', ''))
                                     if not addr:
                                         continue
@@ -248,11 +264,11 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 lp_shot = shot_dir / "leopalace"
                 lp_shot.mkdir(exist_ok=True)
                 props = await search_leopalace(page, area, rent_max, lp_shot, work_address=work_address)
-                props = filter_properties(props, rent_max)
+                props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
                 print(f"  レオパレス: {len(props)}件取得（フィルター後）")
                 for idx, p in enumerate(props):
                     p['source'] = 'leopalace'
-                for idx, lp in enumerate(props[:3]):
+                for idx, lp in enumerate(props):
                     if lp.get('detail_url'):
                         dp = await download_leopalace_pdf(
                             page, pw, lp['detail_url'],
@@ -274,12 +290,17 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 rb_shot.mkdir(exist_ok=True)
                 if await login_reabro(page, rb_shot):
                     props = await search_reabro(page, area, rent_max, rb_shot, work_address=work_address, ctx=ctx)
-                    props = filter_properties(props, rent_max)
+                    props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
                     print(f"  リアブロ: {len(props)}件取得（フィルター後）")
                     for p in props:
                         p['source'] = 'reabro'
-                    for idx, rp in enumerate(props[:2]):
+                    for idx, rp in enumerate(props):
                         if rp.get('room_id'):
+                            # 詳細ページを短時間に連続で開くとサイト側のアクセス
+                            # 制限（search_cookie.php への遷移）を誘発しやすいため、
+                            # 2件目以降は少し間隔を空ける
+                            if idx > 0:
+                                await asyncio.sleep(4)
                             # 一覧テーブルには住所が無いため、物件詳細ページから取得する
                             addr = await get_reabro_address(page, ctx, rp['room_id'])
                             if addr:

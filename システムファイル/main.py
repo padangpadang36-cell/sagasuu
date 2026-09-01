@@ -562,27 +562,93 @@ def _parse_age_years(age_str: str) -> int | None:
     return None
 
 
+def building_key(p: dict) -> tuple:
+    """同一建物かどうかを判定するためのキーを返す。
+
+    明示的な 'building' フィールドがあればそれを使い、無ければ物件名の末尾に
+    付く号室表記（「101号室」「 201」「(1/2階)」等）を除去して建物名を推定する。
+    同名の別建物を誤って統合しないよう、住所も併せてキーにする。
+    """
+    b = str(p.get('building') or '').strip()
+    if b:
+        # 建物を一意に識別できる情報が既にあるので、これだけをキーにする。
+        # 住所文字列はサイトによって末尾に駐車場代・契約条件などが付き、
+        # 同一建物でも号室ごとに異なることがあるため、キーに含めると
+        # 同一建物を別建物と誤判定してしまう。
+        return (normalize_place_name(b), '')
+    name = str(p.get('name') or '').strip()
+    # 「○○ 101号室 (1/2階)」→「○○」
+    b = re.split(r'\s*[0-9０-９]+号室|\s*[（(]', name)[0]
+    # 末尾に残る部屋番号（「 201」「　301」「 2」など）を除去
+    b = re.sub(r'[\s　]+[0-9０-９]{1,4}[A-Za-z]?$', '', b)
+    b = b.strip() or name
+    # 物件名から推定した建物名は同名の別建物がありうるため住所も併用する
+    addr = normalize_place_name(str(p.get('address') or '')).strip()
+    return (normalize_place_name(b), addr)
+
+
 def filter_properties(
     props: list[dict],
     rent_max: int,
     max_age_years: int = None,
+    limit: int = None,
 ) -> list[dict]:
     """
-    物件リストを並べ替えて返す（除外なし）。
+    物件リストを「規定内のみ」に絞り込み、同一建物を1件に集約して並べ替える。
 
-    並び順（優先度順）:
-    ① 家賃が上限に近い順（差額が小さい順）。家賃不明の物件は末尾。
-    ② 家賃が同じ場合は築年数が新しい順。築年数不明は末尾。
+    ① 家賃が上限（規定額）を超える物件は除外する。
+       ※ 規定額は社宅規定の上限であり、超過物件を提示してはいけない。
+         家賃が読み取れなかった物件は判断できないため残す（並びは末尾）。
+    ② 築年数の上限が指定されている場合はそれを超える物件を除外する。
+    ③ 同一建物・別号室が複数ヒットした場合は、家賃が上限に最も近い1件だけを残す。
+    ④ 並び順: 家賃が上限に近い順 → 同額なら築年数が新しい順。
+    ⑤ limit 指定時は上位 limit 件のみ返す。
     """
     def _sort_key(p):
         rent_yen = _parse_rent_yen(p.get('rent', ''))
         age = _parse_age_years(p.get('age', ''))
-        rent_diff = abs(rent_max - rent_yen) if rent_yen is not None else 10_000_000
-        age_val   = age if age is not None else 9999
-        return (rent_diff, age_val)
+        age_val = age if age is not None else 9999
+        if rent_yen is None:
+            # 家賃不明は比較できないため常に末尾に置く
+            return (1, 0, age_val)
+        return (0, rent_max - rent_yen, age_val)
 
-    sorted_props = sorted(props, key=_sort_key)
-    return sorted_props
+    # ① 規定額（家賃上限）を超える物件を除外
+    within = []
+    for p in props:
+        rent_yen = _parse_rent_yen(p.get('rent', ''))
+        if rent_yen is not None and rent_yen > rent_max:
+            continue
+        # ② 築年数の上限
+        if max_age_years is not None:
+            age = _parse_age_years(p.get('age', ''))
+            if age is not None and age > max_age_years:
+                continue
+        within.append(p)
+
+    excluded = len(props) - len(within)
+    if excluded > 0:
+        print(f"    規定外（家賃上限{rent_max:,}円超）のため除外: {excluded}件")
+
+    # ③ 同一建物は家賃が上限に最も近い1件だけを残す
+    sorted_props = sorted(within, key=_sort_key)
+    deduped = []
+    seen_buildings = set()
+    for p in sorted_props:
+        key = building_key(p)
+        if key in seen_buildings:
+            continue
+        seen_buildings.add(key)
+        deduped.append(p)
+
+    merged = len(sorted_props) - len(deduped)
+    if merged > 0:
+        print(f"    同一建物の別号室を集約: {merged}件を除外（家賃が上限に最も近い号室を採用）")
+
+    # ⑤ 件数上限
+    if limit is not None:
+        deduped = deduped[:limit]
+    return deduped
 
 
 def decode_price_code(code: str) -> str:
@@ -1276,14 +1342,14 @@ async def search_homemate(page, area: str, shot_dir: Path,
             print(f"  市選択: {o['t']} (value={o['v']})")
             break
 
-    if not target_city_val and len(citysb_options) > 1:
-        # 「○○市の区から選択」のような政令指定都市限定グループは、
-        # その市名（例: 千葉市）がエリア指定に実際に含まれる場合のみ選択する。
-        # 含まれない場合にこのグループへ誤って入ってしまうと、全く関係ない
-        # 市（グループの先頭市）を検索してしまうため除外し、
-        # 汎用グループ（市から選択 等）を優先する。
+    # 試行する市グループの候補を組み立てる。
+    # 市グループは「23区から選択」「市から選択」「○○市の区から選択」等に
+    # 分かれており、指定した市区町村がどのグループに属するかは事前に
+    # 分からないため、候補を順に試して実際に見つかったものを採用する。
+    if target_city_val:
+        group_candidates = [target_city_val]
+    else:
         designated_match = None
-        designated_city_name = None
         for o in citysb_options:
             m = _re.match(r'^(.+市)の区から選択$', o['t'] or '')
             if m and normalize_place_name(m.group(1)) in area_norm:
@@ -1291,17 +1357,33 @@ async def search_homemate(page, area: str, shot_dir: Path,
                 designated_city_name = normalize_place_name(m.group(1))
                 break
         if designated_match:
-            target_city_val = designated_match['v']
+            # 「○○市の区から選択」は、その市名がエリアに含まれる場合のみ使う。
+            # 含まれないのに選ぶと全く関係ない市を検索してしまう。
+            group_candidates = [designated_match['v']]
             print(f"  市選択(政令指定都市): {designated_match['t']}")
         else:
-            generic_opts = [o for o in citysb_options if o['v'] and 'の区から選択' not in o['t']]
+            generic_opts = [o for o in citysb_options if o['v'] and 'の区から選択' not in (o['t'] or '')]
             candidates = generic_opts if generic_opts else [o for o in citysb_options if o['v']]
-            if candidates:
-                target_city_val = candidates[0]['v']
-                print(f"  市選択(先頭): {candidates[0]['t']}")
+            group_candidates = [o['v'] for o in candidates]
 
-    if target_city_val:
-        await page.select_option('select[name="citysb"]', target_city_val)
+    # 指定エリアが特定の市区町村を名指ししているか
+    # （名指ししている場合、それが見つからないときに別の市区町村へ
+    #   フォールバックすると全く違うエリアの物件を返すことになる）
+    area_local = normalize_place_name(_re.sub(r'[　\s]', '', strip_pref_prefix(area)))
+    if designated_city_name:
+        # 「大阪市」のように政令指定都市名だけが指定され区の指定が無い場合は、
+        # 市内のいずれかの区で検索してよい（区を名指ししていないため）
+        municipality_requested = '区' in area_local.replace(designated_city_name, '', 1)
+    else:
+        municipality_requested = bool(_re.search(r'[区市町村]', area_local))
+
+    target_city_val = None
+    target_ward_val = None
+    first_group_val = None
+    first_ward = None
+
+    for gval in group_candidates:
+        await page.select_option('select[name="citysb"]', gval)
 
         # ③ 区・町（seljiscd）選択 — getCity() のAJAX完了を最大10秒ポーリング待機
         seljiscd_options = []
@@ -1313,35 +1395,49 @@ async def search_homemate(page, area: str, shot_dir: Path,
             """)
             if len(seljiscd_options) > 1:
                 break
-        print(f"  区・町: {len(seljiscd_options)}件")
+        gname = next((o['t'] for o in citysb_options if o['v'] == gval), gval)
+        print(f"  市グループ「{gname}」の区・町: {len(seljiscd_options)}件")
 
-        target_ward_val = None
+        if first_group_val is None:
+            first_group_val = gval
+            first_ward = next((o for o in seljiscd_options if o['v']), None)
+
         for o in seljiscd_options:
-            if o['t'] and normalize_place_name(o['t']) in area_norm:
+            if o['t'] and normalize_place_name(o['t']) in area_local:
+                target_city_val = gval
                 target_ward_val = o['v']
                 print(f"  区選択: {o['t']} (value={o['v']})")
                 break
+        if target_ward_val:
+            break
 
-        # 政令指定都市（大阪市・横浜市 等）で具体的な区名が指定されている場合、
-        # その区が一覧に無い（＝現在掲載物件が無い）ときに無関係な別の区へ
-        # フォールバックすると、指定と全く違うエリアの物件が返ってしまう。
-        # 区名が明示されているケースでは検索を打ち切り「該当なし」として扱う。
-        ward_explicitly_requested = False
-        if designated_city_name:
-            remainder = area_norm.replace(designated_city_name, '', 1)
-            ward_explicitly_requested = '区' in remainder
+    # 指定した市区町村が見つからない場合、無関係な市区町村へフォールバック
+    # すると「人間が手で検索した結果」と全く違うエリアの物件を提示することに
+    # なるため、検索を打ち切って「該当なし」として扱う。
+    # （例: 東京都港区を指定 → 港区に現在掲載物件が無い → 先頭の足立区で
+    #   検索してしまい、足立区の物件が港区の候補として提示されていた）
+    if not target_ward_val and municipality_requested:
+        print(f"  ⚠ 指定された市区町村「{area_local}」が一覧に見つかりません"
+              f"（現在掲載物件なしの可能性）。無関係なエリアは検索しません")
+        return False
 
-        if not target_ward_val and ward_explicitly_requested:
-            print(f"  ⚠ 指定区が一覧に見つかりません（現在掲載物件なしの可能性）。無関係な区は検索しません: {area}")
-            return False
+    if not target_ward_val and first_ward:
+        # 市区町村の指定が無い（都道府県のみ）の場合のみ先頭を採用
+        target_city_val = first_group_val
+        target_ward_val = first_ward['v']
+        await page.select_option('select[name="citysb"]', first_group_val)
+        # 区・町リストの再読み込み（AJAX）を待つ
+        for _ in range(10):
+            await asyncio.sleep(1)
+            reloaded = await page.evaluate("""
+                () => Array.from(document.querySelector('select[name="seljiscd"]').options)
+                    .map(o => o.value)
+            """)
+            if target_ward_val in reloaded:
+                break
+        print(f"  区選択(先頭): {first_ward['t']}")
 
-        if not target_ward_val and seljiscd_options:
-            for o in seljiscd_options:
-                if o['v']:
-                    target_ward_val = o['v']
-                    print(f"  区選択(先頭): {o['t']}")
-                    break
-
+    if target_city_val:
         if target_ward_val:
             await page.select_option('select[name="seljiscd"]', target_ward_val)
             await asyncio.sleep(1)
@@ -1385,8 +1481,18 @@ async def search_homemate(page, area: str, shot_dir: Path,
     return True
 
 
-async def extract_homemate_properties(page, ctx, shot_dir: Path) -> list[dict]:
-    """東建ルームサーチの検索結果ページ(#ta_bukkenlist)から物件情報を抽出する"""
+async def extract_homemate_properties(page, ctx, shot_dir: Path,
+                                       rent_max: int = None,
+                                       limit: int = 3,
+                                       area: str = '') -> list[dict]:
+    """東建ルームサーチの検索結果ページ(#ta_bukkenlist)から物件情報を抽出する。
+
+    以前は一覧テーブルの先頭 limit 行だけを無条件に採用していたため、
+    ①規定額（家賃上限）を超える物件が混ざる ②同一建物の別号室ばかりが並ぶ
+    という問題があった。ここでは全行を抽出したうえで filter_properties に
+    かけて「規定内・同一建物は1件・上限に近い順」に絞り込み、
+    外観写真の取得は最終的に採用した物件のみに限定する。
+    """
     import urllib.request as _req
     properties = []
     print("  東建物件情報を抽出中...")
@@ -1394,7 +1500,7 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path) -> list[dict]:
     try:
         # #ta_bukkenlist テーブルから構造化データを取得するJS
         rows_data = await page.evaluate("""
-            () => {
+            (CURRENT_YEAR) => {
                 // 号室・階数パーサー
                 // セルテキスト "100210/10階角部屋" → {room:"1002", floor:"10/10階"}
                 function parseRoomFloor(txt) {
@@ -1508,11 +1614,14 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path) -> list[dict]:
                         href = dl8 ? dl8.href : '';
                     }
 
-                    // 築年数計算
+                    // 築年数計算（現在年は呼び出し側から渡す）
                     let age = '';
                     if (built) {
                         const yr = parseInt(built.split('/')[0]);
-                        if (!isNaN(yr)) age = (2026-yr) <= 0 ? '新築' : '築'+(2026-yr)+'年';
+                        if (!isNaN(yr)) {
+                            const y = CURRENT_YEAR - yr;
+                            age = y <= 0 ? '新築' : '築'+y+'年';
+                        }
                     }
 
                     props.push({
@@ -1524,18 +1633,24 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path) -> list[dict]:
                 }
                 return props;
             }
-        """)
+        """, jst_now().year)
 
         print(f"  東建テーブル解析: {len(rows_data)}件")
         for i, p in enumerate(rows_data, 1):
             print(f"  物件{i}: {p.get('name','')} {p.get('room','')}号室 / {p.get('rent','')} / {p.get('address','')[:25]}")
 
-        for i, r in enumerate(rows_data[:3]):
+        # 全行を物件データに変換してから絞り込む（写真取得は採用分のみ）
+        all_rows = []
+        for i, r in enumerate(rows_data):
             room_label = f" {r['room']}号室" if r.get('room') else ""
             floor_label = f" ({r['floor']})" if r.get('floor') else ""
-            prop = {
+            all_rows.append({
                 "name": f"{r['name']}{room_label}{floor_label}".strip(),
-                "address": r.get('address', ''),
+                # 同一建物判定用（号室を含まない建物名）
+                "building": (r.get('name') or '').strip(),
+                # 東建は都道府県を省いた住所を返すため補完する
+                # （「港区」が東京都と大阪市の双方に存在する等の誤認を防ぐ）
+                "address": ensure_prefecture(r.get('address', ''), area),
                 "rent": r.get('rent', ''),
                 "layout": r.get('layout', ''),
                 "area": r.get('area', ''),
@@ -1544,9 +1659,19 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path) -> list[dict]:
                 "madori_path": "",
                 "photo_label": "外観写真",
                 "detail_href": r.get('detail_href', ''),
+                "img_url": r.get('img_url', ''),
                 "source": "homemate",
                 "hm_idx": i,
-            }
+            })
+
+        if rent_max is not None:
+            selected = filter_properties(all_rows, rent_max, limit=limit)
+        else:
+            selected = all_rows[:limit]
+        print(f"  東建 採用: {len(selected)}件（規定内・同一建物1件・上限に近い順）")
+
+        for i, prop in enumerate(selected):
+            r = prop
 
             # 外観写真を取得（結果ページの pic1.homemate.co.jp 画像 or 詳細ページ）
             img_url = r.get('img_url', '')
@@ -1936,13 +2061,30 @@ async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
 
     for p in props:
         p['source'] = 'droom'
+        # 住所には駐車場代・契約条件などの説明文が連結されており、その内容は
+        # 同一建物でも号室ごとに異なる。後段の絞り込み・地図取得の前に
+        # ここで整形しておく。
+        p['address'] = clean_droom_address(p.get('address', ''))
+        # room_id は「建物コード-棟-号室」形式なので、末尾の号室を落とした
+        # 部分が同一建物の判定キーになる（例: 700071536-001-201 → 700071536-001）
+        rid = str(p.get('room_id', ''))
+        if rid.count('-') >= 2:
+            p['building'] = rid.rsplit('-', 1)[0]
 
     return props
 
 
-async def download_droom_bulk_pdf(page, out_dir: Path, max_props: int = 20) -> str:
+async def download_droom_bulk_pdf(page, out_dir: Path, max_props: int = 20,
+                                  room_ids: list = None) -> str:
     # D-Room サイト側の仕様で一括出力は20件までに制限されている
-    """D-Room の物件選択チェックボックスをONにしてDroomシート一括PDFをダウンロードする"""
+    """D-Room の物件選択チェックボックスをONにしてDroomシート一括PDFをダウンロードする。
+
+    room_ids を指定した場合はその room_id の物件だけを選択する。
+    指定しない場合は一覧の先頭から max_props 件を選択する（従来動作）。
+    ※ 一覧の先頭から機械的に選ぶと、規定額（家賃上限）を超える物件や
+      同一建物の別号室までPDFに含まれてしまうため、呼び出し側で絞り込んだ
+      物件の room_id を渡すこと。
+    """
     print("── D-Room Droomシート一括出力 ──")
 
     # 物件行チェックボックスのみを選択（フィルタ用CBは除外）
@@ -1950,12 +2092,14 @@ async def download_droom_bulk_pdf(page, out_dir: Path, max_props: int = 20) -> s
     # 可視性チェックには失敗する。関連する<label>のDOM click()を呼ぶことで
     # ブラウザ標準のクリック処理（フレームワーク側の状態更新も含む）を発火させる
     selected = await page.evaluate("""
-        (maxProps) => {
+        ([maxProps, roomIds]) => {
+            const wanted = roomIds && roomIds.length ? new Set(roomIds) : null;
             const boxes = Array.from(document.querySelectorAll('input[type="checkbox"]'));
             let cnt = 0;
             for (const cb of boxes) {
                 if (!cb.value || !cb.value.match(/^\\d{7,12}-\\d{3}/)) continue;
                 if (cb.disabled || cb.checked) continue;
+                if (wanted && !wanted.has(cb.value)) continue;
                 let label = cb.id ? document.querySelector('label[for="' + cb.id + '"]') : null;
                 if (!label) label = cb.closest('label');
                 if (label) {
@@ -1968,8 +2112,11 @@ async def download_droom_bulk_pdf(page, out_dir: Path, max_props: int = 20) -> s
             }
             return cnt;
         }
-    """, max_props)
-    print(f"  選択: {selected}件")
+    """, [max_props, room_ids or []])
+    if room_ids:
+        print(f"  選択: {selected}件（提示対象の物件のみ / 指定{len(room_ids)}件）")
+    else:
+        print(f"  選択: {selected}件")
     await asyncio.sleep(1)
 
     if selected == 0:
@@ -2367,6 +2514,11 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
             if pref_name in work_address:
                 target_pref_code = code
                 break
+    # 都道府県が特定できないまま検索するとエリア絞り込みが一切効かず、
+    # 全国の物件が「指定エリアの検索結果」として返ってしまうため中止する
+    if not target_pref_code:
+        print(f"  リアブロ: 都道府県を特定できないため検索をスキップします（area={area!r}）")
+        return []
 
     # 検索フォーム送信後、稀に search_cookie.php 等の想定外ページ
     # （セッション/クッキー確認の中間ページ）に着地することがある。
@@ -2454,32 +2606,68 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                 # E: step2 内で市区町村ラベルをクリック
                 # ラベルテキストは都道府県名を含まないため、先に都道府県名を除去する
                 # 「ヶ/ケ」等の表記ゆれを吸収するため、比較前に双方を正規化する
+                # 【重要】ラベル探索は必ず step2（市区郡選択）コンテナ内に限定する。
+                # 以前は s2 が取得できない場合に document 全体の <label> を対象と
+                # していたが、モーダルには全都道府県分の市区郡リストが（非表示で）
+                # 存在するため、例えば「港区」で東京都ではなく大阪市港区の
+                # ラベルを掴んでしまい、全く別の府県の物件が返る原因になっていた。
+                # また部分一致（includes）も誤爆の元なので、完全一致を最優先し、
+                # 「○○市」のように末尾の種別を落とした形は後方互換の保険とする。
                 area_city = normalize_place_name(strip_pref_prefix(area))
-                for city_query in [area_city, re.sub(r'[市区町村郡]$', '', area_city)]:
-                    found = await page.evaluate(f"""
-                        () => {{
-                            const norm = (s) => (s || '').replace(/ヶ/g, 'ケ').replace(/ヵ/g, 'カ');
-                            const target = "{city_query}";
-                            const s2 = document.querySelector('.step2.city_select.detail_select_box');
-                            const labels = Array.from(
-                                s2 ? s2.querySelectorAll('label') : document.querySelectorAll('label')
-                            );
-                            const lbl = labels.find(l => norm(l.textContent.trim()).includes(target));
-                            if (lbl) {{
-                                lbl.click();
-                                return {{found: true, text: lbl.textContent.trim().substring(0, 20)}};
-                            }}
-                            return {{found: false}};
-                        }}
-                    """)
-                    if found.get('found'):
-                        city_selected = True
-                        await asyncio.sleep(1)
-                        print(f"  都市選択: {found['text']}")
-                        break
+                city_variants = [area_city]
+                bare = re.sub(r'[市区町村郡]$', '', area_city)
+                if bare and bare != area_city:
+                    city_variants.append(bare)
 
-                if not city_selected:
-                    print(f"  ⚠ 都市 '{area}' のラベルが見つかりません（都道府県全体で検索します）")
+                found = await page.evaluate(
+                    """
+                    ([variants, prefCode]) => {
+                        const norm = (s) => (s || '').replace(/ヶ/g, 'ケ').replace(/ヵ/g, 'カ').trim();
+                        // step2（市区郡選択）のコンテナ内だけを対象にする。
+                        // このコンテナは選択中の都道府県の市区郡だけを保持している
+                        // （東京都選択時は 13xxx の62件のみ）ことを実機で確認済み。
+                        // 見つからない場合に document 全体へフォールバックすると
+                        // 他都道府県の同名ラベル（例: 大阪市港区）を掴んでしまうため
+                        // フォールバックはしない。
+                        // なお、このパネルは display:none のまま操作するため
+                        // 「表示されているか」でラベルを絞り込んではいけない。
+                        const s2 = document.querySelector('.step2.city_select.detail_select_box');
+                        if (!s2) return {found: false, reason: 'step2コンテナが見つかりません'};
+                        const labels = Array.from(s2.querySelectorAll('label'))
+                            .filter(l => l.querySelector('input'));
+                        if (!labels.length) return {found: false, reason: 'step2内に市区郡のラベルがありません'};
+                        const codeOf = (l) => (l.querySelector('input') || {}).value || '';
+                        for (const v of variants) {
+                            // ① 完全一致 → ② 「○○市××区」のように市区郡名で終わる形
+                            let lbl = labels.find(l => norm(l.textContent) === v)
+                                   || labels.find(l => norm(l.textContent).endsWith(v));
+                            if (!lbl) continue;
+                            // city_code は JIS コード（先頭2桁＝都道府県コード）。
+                            // 意図した都道府県のものかを必ず検証する。
+                            const code = codeOf(lbl);
+                            if (prefCode && code && !code.startsWith(prefCode)) {
+                                return {found: false, reason: '別都道府県のラベルを検出(' + code + ')'};
+                            }
+                            lbl.click();
+                            return {found: true, text: norm(lbl.textContent).substring(0, 20),
+                                    matched: v, code: code};
+                        }
+                        return {
+                            found: false,
+                            reason: '一致するラベルなし',
+                            sample: labels.slice(0, 10).map(l => norm(l.textContent)),
+                        };
+                    }
+                    """,
+                    [city_variants, target_pref_code or ''],
+                )
+                if found.get('found'):
+                    city_selected = True
+                    await asyncio.sleep(1)
+                    print(f"  都市選択: {found['text']}（city_code={found.get('code', '')}）")
+                else:
+                    print(f"  ⚠ 都市 '{area_city}' のラベルが見つかりません"
+                          f"（{found.get('reason', '')} / 候補例={found.get('sample', [])}）")
 
                 # F: ×とじる でモーダルを閉じる
                 await page.evaluate("""
@@ -2498,8 +2686,61 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                 except Exception:
                     pass
 
+                # 検索を投げる前に、フォーム上で実際にチェックが入っている
+                # 都道府県・市区町村を読み取って意図通りか確認する
+                # （追加のページアクセスを伴わないDOM参照のみの検証）。
+                try:
+                    checked = await page.evaluate("""
+                        () => {
+                            const val = (sel) => Array.from(document.querySelectorAll(sel))
+                                .filter(i => i.checked)
+                                .map(i => {
+                                    const lbl = i.closest('label');
+                                    return {
+                                        value: i.value,
+                                        text: (lbl ? lbl.textContent : '').replace(/\\s+/g, ' ').trim().slice(0, 20),
+                                    };
+                                });
+                            return {
+                                prefs:  val('input[name="pref_code[]"], input[name="pref_code"]'),
+                                cities: val('input[name="city_code[]"], input[name="city_code"]'),
+                            };
+                        }
+                    """)
+                    pref_vals = [c['value'] for c in checked.get('prefs', [])]
+                    city_vals = [c['value'] for c in checked.get('cities', [])]
+                    city_txts = [c['text'] for c in checked.get('cities', [])]
+                    print(f"  選択状態の確認: 都道府県={pref_vals} / 市区町村={city_txts}{city_vals}")
+                    if pref_vals and target_pref_code not in pref_vals:
+                        print(f"  ⚠ 意図した都道府県({target_pref_code})が選択されていません "
+                              f"→ 別エリアの結果を返さないよう検索を中止します")
+                        return []
+                    # city_code は JIS コード（先頭2桁＝都道府県コード）。
+                    # 1件でも別都道府県が混ざっていたら中止する。
+                    wrong = [v for v in city_vals if v and not v.startswith(target_pref_code)]
+                    if wrong:
+                        print(f"  ⚠ 別都道府県の市区町村が選択されています({wrong}) "
+                              f"→ 別エリアの結果を返さないよう検索を中止します")
+                        return []
+                except Exception as ver_e:
+                    print(f"  選択状態の確認をスキップ: {ver_e}")
+
             except Exception as e:
                 print(f"  ⚠ 所在地選択エラー: {e}")
+
+        # 市区町村を特定できなかった場合、都道府県全体（または全国）の
+        # 一覧が返ってしまい、指定エリアと無関係な物件を提示することになる。
+        # 「人間が手で検索した結果と同等であること」を優先し、この場合は
+        # 結果なしとして扱う。
+        if target_pref_code and not city_selected:
+            if attempt < MAX_ATTEMPTS:
+                # モーダルのAJAX読み込みが間に合わなかった等の一時的失敗の
+                # 可能性があるため、まずはやり直す
+                print(f"  リアブロ: 市区町村を選択できませんでした"
+                      f"（試行{attempt}/{MAX_ATTEMPTS}）→ やり直します")
+                continue
+            print("  リアブロ: 指定エリアの市区町村を特定できなかったため検索を中止します")
+            return []
 
         # ── Step3: 家賃上限を設定 ────────────────────────────────
         RENT_STEPS = [
@@ -2599,41 +2840,30 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
         print(f"  エリア絞り込み後: {len(area_rooms)}件")
         break
 
-    # 0件の場合はキーワード検索でフォールバック（表記ゆれ・都道府県名を除いた市区町村名で）
-    keyword = normalize_place_name(strip_pref_prefix(area)) or area
-    if not area_rooms and keyword:
-        print(f"  → キーワード検索フォールバック: {keyword}")
-        try:
-            kw = page.locator('input[name="keyword"]').first
-            if await kw.is_visible(timeout=2000):
-                await kw.click(click_count=3)
-                await kw.fill(keyword)
-                await kw.press("Enter")
-                try:
-                    await page.wait_for_load_state("networkidle", timeout=10000)
-                except Exception:
-                    pass
-                await asyncio.sleep(3)
-                area_rooms = await page.evaluate(EXTRACT_ROOMS_JS)
-                print(f"  キーワード検索({keyword}): {len(area_rooms)}件")
-        except Exception as e:
-            print(f"  キーワード検索エラー: {e}")
+    # 【削除済み】キーワード検索によるフォールバックは行わない。
+    # リアブロのキーワード検索は「建物名」しか対象にしておらず住所を検索
+    # できないため、例えば「港区」で検索すると名称に「港」を含む他府県
+    # （大阪など）の建物がヒットし、指定エリアと無関係な物件を返していた。
+    # エリア絞り込みができなかった場合は 0件として扱う。
 
     # 物件リストに変換
     result = []
     for r in area_rooms:
-        name = r['building_name'] or 'リアブロ物件'
+        building = (r.get('building_name') or '').strip() or 'リアブロ物件'
+        name = building
         if r['room_name']:
             name = f"{name} {r['room_name']}"
         result.append({
-            'room_id': r['room_id'],
-            'name':    name[:40],
-            'address': r.get('address', ''),
-            'rent':    r.get('rent', ''),
-            'layout':  r.get('layout', ''),
-            'area':    r.get('area', ''),
-            'station': '',
-            'source':  'reabro',
+            'room_id':  r['room_id'],
+            'name':     name[:40],
+            # 同一建物判定用（号室を含まない建物名）
+            'building': building,
+            'address':  r.get('address', ''),
+            'rent':     r.get('rent', ''),
+            'layout':   r.get('layout', ''),
+            'area':     r.get('area', ''),
+            'station':  '',
+            'source':   'reabro',
         })
 
     print(f"  リアブロ 物件数: {len(result)}")
@@ -2876,10 +3106,49 @@ def clean_address_for_maps(addr: str) -> str:
     """
     if not addr:
         return addr
+    # ① 沿線名・駅名以降を落とす
     m = re.search(r'(JR|ＪＲ|[ぁ-んァ-ヶー一-龠]{2,8}線)', addr)
     if m:
-        return addr[:m.start()].strip()
+        addr = addr[:m.start()]
+    # ② 「（未定）」「（仮）」などの注記を削除
+    #    例: "鎌ケ谷市右京塚637番10、637番16（未定）" → "鎌ケ谷市右京塚637番10、637番16"
+    addr = re.sub(r'[（(][^）)]*[）)]', '', addr)
+    # ③ 番地が「、」「，」「･」で複数併記されている場合は先頭のみ採用する。
+    #    複数番地のままではジオコーディングに失敗し、地図が取得できない。
+    #    例: "鎌ケ谷市右京塚637番10、637番16" → "鎌ケ谷市右京塚637番10"
+    addr = re.split(r'[、,，・･]', addr)[0]
+    # ④ 末尾に残る区切り文字・空白を除去
+    addr = re.sub(r'[\s　\-－ー]+$', '', addr.strip())
     return addr.strip()
+
+
+def ensure_prefecture(addr: str, area: str) -> str:
+    """住所に都道府県が含まれていない場合、検索エリアの都道府県を補って返す。
+
+    東建ルームサーチ等は「港区海岸3-22-23」のように都道府県を省いた住所を
+    返すが、「港区」は東京都と大阪市の双方に存在するなど同名の市区町村が
+    あるため、そのままではGoogleマップが別の都道府県を指してしまう。
+    """
+    if not addr or not area:
+        return addr
+    # 既に都道府県から始まっていれば何もしない
+    for pref_name in PREF_CODE:
+        if addr.startswith(pref_name):
+            return addr
+    # PREF_CODE のキーは接尾辞なし（例: "東京"）なので、
+    # エリア文字列側から正しい表記（"東京都" 等）を取り出す
+    for pref_name in PREF_CODE:
+        idx = area.find(pref_name)
+        if idx < 0:
+            continue
+        full = pref_name
+        nxt = area[idx + len(pref_name): idx + len(pref_name) + 1]
+        if nxt in ('都', '道', '府', '県'):
+            full = pref_name + nxt
+        elif pref_name != '北海道':
+            full = pref_name + {'東京': '都', '大阪': '府', '京都': '府'}.get(pref_name, '県')
+        return f"{full}{addr}"
+    return addr
 
 
 def clean_droom_address(addr: str) -> str:
@@ -3210,7 +3479,9 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
                 ok = await search_homemate(hm_page, area, hm_shot_dir,
                                            work_address=case.get('勤務地住所', ''))
                 if ok:
-                    hm_props = await extract_homemate_properties(hm_page, ctx, hm_shot_dir)
+                    hm_props = await extract_homemate_properties(
+                        hm_page, ctx, hm_shot_dir,
+                        rent_max=rent_max, limit=3, area=area)
                     print(f"  東建: {len(hm_props)}件取得")
 
                     # 物件詳細PDFをダウンロード（hm_page を閉じる前に実行）
@@ -3218,7 +3489,9 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
                         if hp.get('detail_href'):
                             dp = await download_homemate_detail_pdf(
                                 hm_page, playwright, hp['detail_href'], case_dir)
-                            hm_detail_pdfs[idx] = dp
+                            # 後段の突き合わせは hm_idx（一覧上の行番号）で行うため、
+                            # ループ位置ではなく hm_idx をキーにする
+                            hm_detail_pdfs[hp.get('hm_idx', idx)] = dp
                             print(f"  東建PDF{idx+1}: {dp}")
             await hm_page.close()
         except Exception as e:
@@ -3237,8 +3510,12 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
             if dr_logged_in:
                 droom_props = await search_droom(droom_page, area, rent_max, droom_shot_dir)
                 print(f"  D-Room: {len(droom_props)}件取得")
+                # 規定内・同一建物1件に絞り込んでから、その物件だけをPDF化する
+                droom_props = filter_properties(droom_props, rent_max, limit=3)
                 if droom_props:
-                    droom_bulk_pdf = await download_droom_bulk_pdf(droom_page, case_dir)
+                    droom_bulk_pdf = await download_droom_bulk_pdf(
+                        droom_page, case_dir,
+                        room_ids=[p['room_id'] for p in droom_props if p.get('room_id')])
             await droom_page.close()
         except Exception as e:
             print(f"  D-Room検索エラー: {e}")
@@ -3310,13 +3587,13 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
             rp['source'] = 'reabro'
             rp['reabro_idx'] = idx2
 
-        # ⑥-a 並べ替え（家賃が上限に近い順・同額なら築年数新しい順）
-        print(f"  ── 物件並べ替え（家賃が上限に近い順 / 同額なら築年数新しい順）──")
-        atbb_props   = filter_properties(atbb_props,   rent_max)
-        hm_props     = filter_properties(hm_props,     rent_max)
-        droom_props  = filter_properties(droom_props,  rent_max)
-        lp_props     = filter_properties(lp_props,     rent_max)
-        reabro_props = filter_properties(reabro_props, rent_max)
+        # ⑥-a 絞り込み（規定額内・同一建物1件・家賃が上限に近い順／同額なら築浅順）
+        print(f"  ── 物件絞り込み（規定内 / 同一建物1件 / 家賃が上限に近い順 / 同額なら築年数新しい順）──")
+        atbb_props   = filter_properties(atbb_props,   rent_max, limit=3)
+        hm_props     = filter_properties(hm_props,     rent_max, limit=3)
+        droom_props  = filter_properties(droom_props,  rent_max, limit=3)
+        lp_props     = filter_properties(lp_props,     rent_max, limit=3)
+        reabro_props = filter_properties(reabro_props, rent_max, limit=3)
 
         properties = []
         # 各ソースの先頭1件を追加

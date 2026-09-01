@@ -238,17 +238,23 @@ with tab_manual:
 
                 if properties:
                     st.subheader(f"🏠 検索結果（{len(properties)}件）")
+                    st.caption("各サイトごとに、家賃上限（規定額）以内の物件のみを対象とし、"
+                               "同一建物は上限に最も近い1部屋に集約したうえで、"
+                               "家賃が上限に近い順（同額なら築年数が浅い順）に最大3件を表示しています。")
                     table_rows = [{
                         "サイト": p.get("source", ""),
                         "物件名": p.get("name", ""),
                         "家賃": p.get("rent", ""),
                         "間取り": p.get("layout", ""),
                         "面積": p.get("area", ""),
+                        "築年数": p.get("age", ""),
                         "住所": p.get("address", ""),
                     } for p in properties]
                     st.dataframe(table_rows, use_container_width=True)
                 else:
-                    st.info("該当する物件が見つかりませんでした。")
+                    st.info("該当する物件が見つかりませんでした。"
+                            "（家賃上限を超える物件や、指定エリア外の物件は"
+                            "提示しない仕様のため0件になることがあります）")
 
                 # 生成されたPDF一覧とZIPダウンロード
                 case_id_safe = re.sub(r'[\\/:*?"<>|]', "_",
