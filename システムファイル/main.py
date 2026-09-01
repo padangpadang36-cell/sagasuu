@@ -105,20 +105,38 @@ def normalize_place_name(s: str) -> str:
     return s.replace('ヶ', 'ケ').replace('ヵ', 'カ')
 
 
+def _pref_full_name(name: str) -> str:
+    """PREF_CODE のキー（接尾辞なし）を正式名称に変換する。"""
+    if name == "北海道":
+        return name
+    if name == "東京":
+        return "東京都"
+    if name in ("大阪", "京都"):
+        return name + "府"
+    return name + "県"
+
+
+# 都道府県の正式名称（長い順）。前方一致の判定に使う。
+PREF_FULL_NAMES = sorted((_pref_full_name(n) for n in PREF_CODE), key=len, reverse=True)
+
+
 def strip_pref_prefix(area: str) -> str:
     """エリア文字列の先頭についた都道府県名を除去し、市区町村部分のみを返す。
     各サイトの市区町村名マッチングは都道府県プレフィックスなしの文字列を
     前提にしていることが多いため、都道府県セレクトボックス由来の
     「都道府県名+市区町村」形式の文字列から都道府県名だけを取り除く。
+
+    ※ 判定には必ず正式名称（東京都・京都府・北海道 等）を使うこと。
+      PREF_CODE のキーは接尾辞なし（「京都」など）であり、「京都」は
+      それ自体が「都」で終わるため、接尾辞付きかどうかを文字で判定すると
+      「京都府京都市南区」から「京都」だけを削って「府京都市南区」という
+      不正な市区町村名になり、京都府の検索が全く一致しなくなる。
     """
     if not area:
         return area
-    for pref_name in sorted(PREF_CODE.keys(), key=len, reverse=True):
-        candidates = [pref_name] if pref_name.endswith(("都", "道", "府", "県")) else \
-            [pref_name + s for s in ("都", "道", "府", "県")]
-        for full in candidates:
-            if area.startswith(full):
-                return area[len(full):]
+    for full in PREF_FULL_NAMES:
+        if area.startswith(full):
+            return area[len(full):]
     return area
 
 
@@ -2686,6 +2704,39 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                 except Exception:
                     pass
 
+                # モーダルは選択した都道府県の市区郡リストを「追加」していく
+                # 作りで、初期表示の東京都などが選択されたまま残ることがある
+                # （実機で 都道府県=['13','26'] となるのを確認）。
+                # 対象外の都道府県・市区町村のチェックを外してから検索する。
+                try:
+                    cleared = await page.evaluate(
+                        """
+                        (prefCode) => {
+                            let n = 0;
+                            const uncheck = (sel, keep) => {
+                                document.querySelectorAll(sel).forEach(i => {
+                                    if (!i.checked) return;
+                                    if (keep(i.value)) return;
+                                    const lbl = i.closest('label');
+                                    if (lbl) lbl.click(); else i.click();
+                                    n++;
+                                });
+                            };
+                            uncheck('input[name="pref_code[]"], input[name="pref_code"]',
+                                    v => v === prefCode);
+                            uncheck('input[name="city_code[]"], input[name="city_code"]',
+                                    v => String(v).startsWith(prefCode));
+                            return n;
+                        }
+                        """,
+                        target_pref_code,
+                    )
+                    if cleared:
+                        print(f"  対象外の都道府県・市区町村の選択を解除: {cleared}件")
+                        await asyncio.sleep(1)
+                except Exception as clr_e:
+                    print(f"  選択解除をスキップ: {clr_e}")
+
                 # 検索を投げる前に、フォーム上で実際にチェックが入っている
                 # 都道府県・市区町村を読み取って意図通りか確認する
                 # （追加のページアクセスを伴わないDOM参照のみの検証）。
@@ -3113,11 +3164,14 @@ def clean_address_for_maps(addr: str) -> str:
     # ② 「（未定）」「（仮）」などの注記を削除
     #    例: "鎌ケ谷市右京塚637番10、637番16（未定）" → "鎌ケ谷市右京塚637番10、637番16"
     addr = re.sub(r'[（(][^）)]*[）)]', '', addr)
-    # ③ 番地が「、」「，」「･」で複数併記されている場合は先頭のみ採用する。
+    # ③ サイト側の入力ミスで「１丁目丁目」のように重複することがあり、
+    #    そのままではジオコーディングに失敗するため重複を畳む
+    addr = re.sub(r'(丁目)\1+', r'\1', addr)
+    # ④ 番地が「、」「，」「･」で複数併記されている場合は先頭のみ採用する。
     #    複数番地のままではジオコーディングに失敗し、地図が取得できない。
     #    例: "鎌ケ谷市右京塚637番10、637番16" → "鎌ケ谷市右京塚637番10"
     addr = re.split(r'[、,，・･]', addr)[0]
-    # ④ 末尾に残る区切り文字・空白を除去
+    # ⑤ 末尾に残る区切り文字・空白を除去
     addr = re.sub(r'[\s　\-－ー]+$', '', addr.strip())
     return addr.strip()
 
@@ -3131,23 +3185,16 @@ def ensure_prefecture(addr: str, area: str) -> str:
     """
     if not addr or not area:
         return addr
-    # 既に都道府県から始まっていれば何もしない
-    for pref_name in PREF_CODE:
-        if addr.startswith(pref_name):
+    # 既に都道府県（正式名称）から始まっていれば何もしない。
+    # ここで接尾辞なしのキー（"京都" 等）で判定すると、"京都市南区…" のような
+    # 市区町村始まりの住所を「都道府県付き」と誤判定してしまう。
+    for full in PREF_FULL_NAMES:
+        if addr.startswith(full):
             return addr
-    # PREF_CODE のキーは接尾辞なし（例: "東京"）なので、
-    # エリア文字列側から正しい表記（"東京都" 等）を取り出す
-    for pref_name in PREF_CODE:
-        idx = area.find(pref_name)
-        if idx < 0:
-            continue
-        full = pref_name
-        nxt = area[idx + len(pref_name): idx + len(pref_name) + 1]
-        if nxt in ('都', '道', '府', '県'):
-            full = pref_name + nxt
-        elif pref_name != '北海道':
-            full = pref_name + {'東京': '都', '大阪': '府', '京都': '府'}.get(pref_name, '県')
-        return f"{full}{addr}"
+    # エリア文字列に含まれる都道府県を正式名称で補う
+    for full in PREF_FULL_NAMES:
+        if full in area:
+            return f"{full}{addr}"
     return addr
 
 

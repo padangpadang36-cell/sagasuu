@@ -44,6 +44,38 @@ PREF_LIST = [
     "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県",
 ]
 
+
+def _compose_area(pref: str, free_text: str) -> str:
+    """都道府県セレクトと自由入力欄からエリア文字列を組み立てる。
+
+    自由入力欄に都道府県まで入力されている場合（例: 「神奈川県 横浜市鶴見区」）、
+    単純に連結すると「神奈川県神奈川県 横浜市鶴見区」となり、どのサイトでも
+    市区町村を特定できず0件になってしまう。二重に付かないようにする。
+    また、途中の空白も市区町村名の照合を妨げるため取り除く。
+    """
+    free = re.sub(r'[\s　]+', '', (free_text or '').strip())
+    pref = '' if pref == "選択してください" else (pref or '')
+    if not free:
+        return pref
+    for p in PREF_LIST:
+        if p in free:
+            return free
+    return f"{pref}{free}"
+
+
+def _compose_address(pref: str, free_text: str) -> str:
+    """勤務先住所を組み立てる（自由入力に都道府県があれば二重に付けない）。
+    住所は空白を含んでいても問題ないため、空白はそのまま残す。"""
+    free = (free_text or '').strip()
+    pref = '' if pref == "選択してください" else (pref or '')
+    if not free:
+        return pref
+    for p in PREF_LIST:
+        if p in free:
+            return free
+    return f"{pref}{free}"
+
+
 # ── ページ設定 ───────────────────────────────────────────────
 st.set_page_config(
     page_title="社宅物件提案書 自動生成",
@@ -150,8 +182,8 @@ with tab_manual:
         manual_layout = st.text_input("希望間取り（任意）", placeholder="例: 1K、1LDK", key="manual_layout")
         manual_commute = st.text_input("通勤方法（任意）", placeholder="例: 車、電車", key="manual_commute")
 
-        manual_area = (manual_area_pref if manual_area_pref != "選択してください" else "") + manual_area_free.strip()
-        manual_work_addr = (manual_work_pref if manual_work_pref != "選択してください" else "") + manual_work_addr_free.strip()
+        manual_area      = _compose_area(manual_area_pref, manual_area_free)
+        manual_work_addr = _compose_address(manual_work_pref, manual_work_addr_free)
 
     with col_m2:
         st.markdown('<p class="section-label">検索サイト選択</p>', unsafe_allow_html=True)
