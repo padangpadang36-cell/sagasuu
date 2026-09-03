@@ -50,6 +50,7 @@ from main import (
     login_droom, search_droom, download_droom_bulk_pdf,
     search_leopalace, download_leopalace_pdf,
     login_reabro, search_reabro, download_reabro_pdfs, get_reabro_address,
+    geocode_jp, distance_km, default_distance_limit_km, clean_address_for_maps,
     clean_droom_address, append_labeled_maps_to_pdf,
 )
 
@@ -81,6 +82,26 @@ async def run_manual_search(params: dict):
     print(f"  エリア: {area}  家賃上限: {rent_max:,}円  間取り: {layout}")
     print(f"  選択サイト: {', '.join(sites) if sites else '（なし）'}")
 
+    # 勤務先から遠すぎる物件を提示しないための距離条件
+    # （指定が無ければ通勤方法から既定値を決める）
+    origin = None
+    max_km = None
+    if work_address:
+        raw_km = params.get("距離上限km", params.get("max_distance_km"))
+        try:
+            max_km = float(raw_km) if raw_km else None
+        except (TypeError, ValueError):
+            max_km = None
+        if max_km is None:
+            max_km = default_distance_limit_km(commute)
+        origin = geocode_jp(work_address)
+        if origin:
+            print(f"  勤務先座標: {origin[0]:.5f}, {origin[1]:.5f} "
+                  f"／ 距離上限: {max_km:.0f}km（直線距離・通勤方法「{commute or '未指定'}」）")
+        else:
+            print(f"  ⚠ 勤務先住所の座標を特定できないため距離での絞り込みは行いません: {work_address}")
+            max_km = None
+
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True, slow_mo=400)
         ctx = await browser.new_context(
@@ -89,7 +110,8 @@ async def run_manual_search(params: dict):
         )
         try:
             await _run_all_sites(ctx, pw, sites, area, rent_max, layout,
-                                  work_address, commute, shot_dir, case_dir, case_id, font_name, all_props)
+                                  work_address, commute, shot_dir, case_dir, case_id, font_name, all_props,
+                                  origin=origin, max_km=max_km)
         finally:
             await browser.close()
 
@@ -149,7 +171,8 @@ RESULT_LIMIT = 3
 
 
 async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
-                          work_address, commute, shot_dir, case_dir, case_id, font_name, all_props):
+                          work_address, commute, shot_dir, case_dir, case_id, font_name, all_props,
+                          origin=None, max_km=None):
         # 通勤ルート地図の取得専用ページ（サイトへのログイン不要）
         map_page = await ctx.new_page() if work_address else None
         # ── ATBB ─────────────────────────────────────────────
@@ -164,7 +187,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                     for idx, p in enumerate(props):
                         p['source'] = 'atbb'
                         p['atbb_idx'] = idx
-                    props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
+                    props = filter_properties(props, rent_max, limit=RESULT_LIMIT, layout=layout,
+                                              origin=origin, max_distance_km=max_km)
                     print(f"  ATBB: {len(props)}件取得（フィルター後）")
                     for idx, p in enumerate(props):
                         dp = await download_atbb_print_pdf(page, ctx, pw, p.get('atbb_idx', idx),
@@ -193,8 +217,10 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                         # 規定外の物件や同一建物の別号室ばかりが並んでいた）
                         props = await extract_homemate_properties(
                             page, ctx, hm_shot,
-                            rent_max=rent_max, limit=RESULT_LIMIT, area=area)
-                        props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
+                            rent_max=rent_max, limit=RESULT_LIMIT, area=area,
+                            layout=layout)
+                        props = filter_properties(props, rent_max, limit=RESULT_LIMIT, layout=layout,
+                                              origin=origin, max_distance_km=max_km)
                         print(f"  東建: {len(props)}件取得（フィルター後）")
                         for idx, hp in enumerate(props):
                             if hp.get('detail_href'):
@@ -219,7 +245,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 dr_shot.mkdir(exist_ok=True)
                 if await login_droom(page, dr_shot):
                     props = await search_droom(page, area, rent_max, dr_shot)
-                    props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
+                    props = filter_properties(props, rent_max, limit=RESULT_LIMIT, layout=layout,
+                                              origin=origin, max_distance_km=max_km)
                     print(f"  D-Room: {len(props)}件取得（フィルター後）")
                     for p in props:
                         p['source'] = 'droom'
@@ -264,7 +291,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 lp_shot = shot_dir / "leopalace"
                 lp_shot.mkdir(exist_ok=True)
                 props = await search_leopalace(page, area, rent_max, lp_shot, work_address=work_address)
-                props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
+                props = filter_properties(props, rent_max, limit=RESULT_LIMIT, layout=layout,
+                                              origin=origin, max_distance_km=max_km)
                 print(f"  レオパレス: {len(props)}件取得（フィルター後）")
                 for idx, p in enumerate(props):
                     p['source'] = 'leopalace'
@@ -290,38 +318,62 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 rb_shot.mkdir(exist_ok=True)
                 if await login_reabro(page, rb_shot):
                     props = await search_reabro(page, area, rent_max, rb_shot, work_address=work_address, ctx=ctx)
-                    props = filter_properties(props, rent_max, limit=RESULT_LIMIT)
-                    print(f"  リアブロ: {len(props)}件取得（フィルター後）")
-                    for p in props:
-                        p['source'] = 'reabro'
-                    for idx, rp in enumerate(props):
-                        if rp.get('room_id'):
-                            # 詳細ページを短時間に連続で開くとサイト側のアクセス
-                            # 制限（search_cookie.php への遷移）を誘発しやすいため、
-                            # 2件目以降は少し間隔を空ける
-                            if idx > 0:
-                                await asyncio.sleep(4)
-                            # 一覧テーブルには住所が無いため、物件詳細ページから取得する
-                            addr = await get_reabro_address(page, ctx, rp['room_id'])
-                            if addr:
-                                rp['address'] = addr
-                                print(f"  リアブロ住所取得: {addr}")
-                            map_png = ""
-                            if map_page and work_address and addr:
-                                map_png = str(shot_dir / f"map_reabro_{idx}.png")
-                                ok_map = await get_maps_screenshot(map_page, addr, work_address, map_png,
-                                                                   commute_method=commute)
-                                if not ok_map:
-                                    map_png = ""
-                            pdfs = await download_reabro_pdfs(
-                                ctx, rp['room_id'],
-                                f"{case_id}_リアブロ_{rp.get('name', f'物件{idx+1}')}",
-                                case_dir, font_name, map_png,
-                                commute_method=commute, workplace=work_address)
-                            saved = [v for v in pdfs.values() if v]
-                            if saved:
-                                print(f"  リアブロ PDF{idx+1}: {len(saved)}件保存")
-                    all_props.extend(props)
+                    # リアブロは一覧に住所が無く、住所は物件詳細ページを開かないと
+                    # 取得できない。そのため距離の絞り込みはここでは行わず、
+                    # 家賃・間取り・同一建物の集約だけを済ませた候補リストを作り、
+                    # 家賃順に1件ずつ住所を取得しながら距離を判定して採用する。
+                    candidates = filter_properties(props, rent_max, layout=layout)
+                    print(f"  リアブロ: 候補{len(candidates)}件から最大{RESULT_LIMIT}件を選定します")
+                    selected = []
+                    too_far = 0
+                    for idx, rp in enumerate(candidates):
+                        if len(selected) >= RESULT_LIMIT:
+                            break
+                        if not rp.get('room_id'):
+                            continue
+                        # 詳細ページを短時間に連続で開くとサイト側のアクセス
+                        # 制限（search_cookie.php への遷移）を誘発しやすいため、
+                        # 2件目以降は少し間隔を空ける
+                        if idx > 0:
+                            await asyncio.sleep(4)
+                        # 一覧テーブルには住所が無いため、物件詳細ページから取得する
+                        addr = await get_reabro_address(page, ctx, rp['room_id'])
+                        if addr:
+                            rp['address'] = addr
+                            print(f"  リアブロ住所取得: {addr}")
+                        # 勤務先から遠すぎる物件は採用せず次の候補へ
+                        if origin and max_km and addr:
+                            loc = geocode_jp(clean_address_for_maps(addr))
+                            if loc:
+                                d = distance_km(origin, loc)
+                                rp['distance_km'] = round(d, 1)
+                                if d > max_km:
+                                    too_far += 1
+                                    print(f"    → 勤務先から{d:.1f}km（上限{max_km:.0f}km）のため見送り: "
+                                          f"{rp.get('name', '')}")
+                                    continue
+                        rp['source'] = 'reabro'
+                        n = len(selected) + 1
+                        map_png = ""
+                        if map_page and work_address and addr:
+                            map_png = str(shot_dir / f"map_reabro_{n-1}.png")
+                            ok_map = await get_maps_screenshot(map_page, addr, work_address, map_png,
+                                                               commute_method=commute)
+                            if not ok_map:
+                                map_png = ""
+                        pdfs = await download_reabro_pdfs(
+                            ctx, rp['room_id'],
+                            f"{case_id}_リアブロ_{rp.get('name', f'物件{n}')}",
+                            case_dir, font_name, map_png,
+                            commute_method=commute, workplace=work_address)
+                        saved = [v for v in pdfs.values() if v]
+                        if saved:
+                            print(f"  リアブロ PDF{n}: {len(saved)}件保存")
+                        selected.append(rp)
+                    if too_far:
+                        print(f"  リアブロ: 勤務先から{max_km:.0f}km超のため見送り {too_far}件")
+                    print(f"  リアブロ: {len(selected)}件採用")
+                    all_props.extend(selected)
                 await page.close()
             except Exception as e:
                 print(f"  リアブロ エラー: {e}")

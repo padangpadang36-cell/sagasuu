@@ -180,7 +180,14 @@ with tab_manual:
                                                    key="manual_work_addr_free")
 
         manual_layout = st.text_input("希望間取り（任意）", placeholder="例: 1K、1LDK", key="manual_layout")
+        st.caption("指定した間取り以外は提示しません（ワンルームを含めたい場合は「ワンルーム」も入力してください）")
         manual_commute = st.text_input("通勤方法（任意）", placeholder="例: 車、電車", key="manual_commute")
+
+        manual_dist = st.number_input(
+            "勤務先からの距離上限（km・0で自動）", min_value=0.0, max_value=100.0,
+            value=0.0, step=1.0, key="manual_dist")
+        st.caption("勤務先住所を入力した場合のみ有効。0のときは通勤方法から自動判定します"
+                   "（徒歩3km／自転車7km／電車・バス15km／車20km・直線距離）")
 
         manual_area      = _compose_area(manual_area_pref, manual_area_free)
         manual_work_addr = _compose_address(manual_work_pref, manual_work_addr_free)
@@ -224,6 +231,7 @@ with tab_manual:
                 "勤務地住所":      manual_work_addr.strip(),
                 "希望間取り":      manual_layout.strip(),
                 "通勤方法":        manual_commute.strip(),
+                "距離上限km":      (manual_dist if manual_dist > 0 else None),
                 "氏名":            manual_name.strip(),
                 "管理番号":        manual_anken.strip() or "手動検索",
                 "sites":           sites,
@@ -280,6 +288,7 @@ with tab_manual:
                         "間取り": p.get("layout", ""),
                         "面積": p.get("area", ""),
                         "築年数": p.get("age", ""),
+                        "勤務先まで": (f"{p['distance_km']}km" if p.get("distance_km") is not None else ""),
                         "住所": p.get("address", ""),
                     } for p in properties]
                     st.dataframe(table_rows, use_container_width=True)

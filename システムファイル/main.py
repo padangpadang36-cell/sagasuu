@@ -26,6 +26,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
 
 import re
 import shutil
+import unicodedata
 import openpyxl
 from playwright.async_api import async_playwright
 from reportlab.lib.pagesizes import A4
@@ -580,6 +581,108 @@ def _parse_age_years(age_str: str) -> int | None:
     return None
 
 
+_GEOCODE_CACHE: dict = {}
+
+
+def geocode_jp(address: str):
+    """住所から緯度経度を取得する（国土地理院の住所検索API・APIキー不要）。
+    取得できない場合は None を返す。同一プロセス内ではキャッシュする。
+    """
+    if not address:
+        return None
+    key = address.strip()
+    if key in _GEOCODE_CACHE:
+        return _GEOCODE_CACHE[key]
+    import urllib.request as _req
+    import urllib.parse as _parse
+    import json as _json
+    result = None
+    # 住所が詳細すぎて引けない場合に備え、末尾を段階的に削って再試行する
+    candidates = [key]
+    trimmed = re.sub(r'[0-9０-９][0-9０-９\-－ー番地号丁目の]*$', '', key).strip()
+    if trimmed and trimmed != key:
+        candidates.append(trimmed)
+    for cand in candidates:
+        try:
+            url = ("https://msearch.gsi.go.jp/address-search/AddressSearch?q="
+                   + _parse.quote(cand))
+            req = _req.Request(url, headers={"User-Agent": "sagasuu/1.0"})
+            with _req.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read().decode("utf-8"))
+            if data:
+                lon, lat = data[0]["geometry"]["coordinates"][:2]
+                result = (float(lat), float(lon))
+                break
+        except Exception:
+            continue
+    _GEOCODE_CACHE[key] = result
+    return result
+
+
+def distance_km(a, b) -> float:
+    """2地点（緯度, 経度）間の直線距離をkmで返す。"""
+    import math
+    lat1, lon1 = a
+    lat2, lon2 = b
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(h))
+
+
+def default_distance_limit_km(commute_method: str) -> float:
+    """通勤方法から、勤務先からの距離の上限（km・直線距離）の既定値を決める。
+    直線距離は実際の道のりより短く出るため、やや余裕を持たせた値にしている。
+    """
+    m = commute_method or ''
+    limits = []
+    # 「徒歩、電車」のように複数指定されている場合は、そのいずれでも
+    # 通えるという意味なので最も緩い（遠くまで許容する）条件を採用する。
+    if re.search(r'徒歩|歩き', m):
+        limits.append(3.0)
+    if re.search(r'自転車|チャリ', m):
+        limits.append(7.0)
+    if re.search(r'電車|バス|鉄道|公共|新幹線|地下鉄', m):
+        limits.append(15.0)
+    # 「電車」に含まれる「車」で誤検出しないよう、単独の車のみを見る
+    if re.search(r'(?<!電)車|自動車|カー', m.replace('自転車', '')):
+        limits.append(20.0)
+    return max(limits) if limits else 15.0
+
+
+def normalize_layout(s: str) -> str:
+    """間取り表記を比較用に正規化する。
+
+    '１ＬＤＫ' → '1LDK' / 'ワンルーム' → '1R' / '1 K' → '1K'
+    判定できない場合は空文字を返す（＝間取り不明として扱う）。
+    """
+    if not s:
+        return ''
+    t = unicodedata.normalize('NFKC', str(s)).upper()
+    t = re.sub(r'[\s　・,、/]', '', t)
+    if not t:
+        return ''
+    if 'ワンルーム' in t or t in ('1R', 'R', '1ルーム'):
+        return '1R'
+    m = re.search(r'([1-9])(SLDK|LDK|SDK|SLK|DK|LK|K|R)', t)
+    if m:
+        num, typ = m.group(1), m.group(2)
+        return '1R' if typ == 'R' and num == '1' else f"{num}{typ}"
+    return ''
+
+
+def parse_layout_spec(spec: str) -> set:
+    """希望間取りの指定文字列を正規化した集合にする。
+    例: '1K,1LDK' → {'1K', '1LDK'} / '1K・1DK' → {'1K', '1DK'}
+    """
+    if not spec:
+        return set()
+    parts = re.split(r'[,、　\s・/／]+', str(spec))
+    return {n for n in (normalize_layout(p) for p in parts) if n}
+
+
 def building_key(p: dict) -> tuple:
     """同一建物かどうかを判定するためのキーを返す。
 
@@ -610,6 +713,9 @@ def filter_properties(
     rent_max: int,
     max_age_years: int = None,
     limit: int = None,
+    layout: str = '',
+    origin: tuple = None,
+    max_distance_km: float = None,
 ) -> list[dict]:
     """
     物件リストを「規定内のみ」に絞り込み、同一建物を1件に集約して並べ替える。
@@ -617,11 +723,14 @@ def filter_properties(
     ① 家賃が上限（規定額）を超える物件は除外する。
        ※ 規定額は社宅規定の上限であり、超過物件を提示してはいけない。
          家賃が読み取れなかった物件は判断できないため残す（並びは末尾）。
-    ② 築年数の上限が指定されている場合はそれを超える物件を除外する。
-    ③ 同一建物・別号室が複数ヒットした場合は、家賃が上限に最も近い1件だけを残す。
-    ④ 並び順: 家賃が上限に近い順 → 同額なら築年数が新しい順。
-    ⑤ limit 指定時は上位 limit 件のみ返す。
+    ② 希望間取りが指定されている場合、それ以外の間取りは除外する。
+       間取りが読み取れない物件は判断できないため残す。
+    ③ 築年数の上限が指定されている場合はそれを超える物件を除外する。
+    ④ 同一建物・別号室が複数ヒットした場合は、家賃が上限に最も近い1件だけを残す。
+    ⑤ 並び順: 家賃が上限に近い順 → 同額なら築年数が新しい順。
+    ⑥ limit 指定時は上位 limit 件のみ返す。
     """
+    wanted_layouts = parse_layout_spec(layout)
     def _sort_key(p):
         rent_yen = _parse_rent_yen(p.get('rent', ''))
         age = _parse_age_years(p.get('age', ''))
@@ -631,22 +740,32 @@ def filter_properties(
             return (1, 0, age_val)
         return (0, rent_max - rent_yen, age_val)
 
-    # ① 規定額（家賃上限）を超える物件を除外
+    # ① 規定額（家賃上限）を超える物件、② 希望間取り以外を除外
     within = []
+    over_rent = 0
+    wrong_layout = 0
     for p in props:
         rent_yen = _parse_rent_yen(p.get('rent', ''))
         if rent_yen is not None and rent_yen > rent_max:
+            over_rent += 1
             continue
-        # ② 築年数の上限
+        if wanted_layouts:
+            lay = normalize_layout(p.get('layout', ''))
+            # 間取りが読み取れない物件は判断できないため残す
+            if lay and lay not in wanted_layouts:
+                wrong_layout += 1
+                continue
+        # ③ 築年数の上限
         if max_age_years is not None:
             age = _parse_age_years(p.get('age', ''))
             if age is not None and age > max_age_years:
                 continue
         within.append(p)
 
-    excluded = len(props) - len(within)
-    if excluded > 0:
-        print(f"    規定外（家賃上限{rent_max:,}円超）のため除外: {excluded}件")
+    if over_rent > 0:
+        print(f"    規定外（家賃上限{rent_max:,}円超）のため除外: {over_rent}件")
+    if wrong_layout > 0:
+        print(f"    希望間取り（{'/'.join(sorted(wanted_layouts))}）以外のため除外: {wrong_layout}件")
 
     # ③ 同一建物は家賃が上限に最も近い1件だけを残す
     sorted_props = sorted(within, key=_sort_key)
@@ -663,7 +782,31 @@ def filter_properties(
     if merged > 0:
         print(f"    同一建物の別号室を集約: {merged}件を除外（家賃が上限に最も近い号室を採用）")
 
-    # ⑤ 件数上限
+    # ⑤ 勤務先から遠すぎる物件を除外する。
+    #    ジオコーディングは1件ずつ通信が発生するため、家賃順に前から評価し
+    #    必要件数が揃った時点で打ち切る（無駄な問い合わせをしない）。
+    if origin and max_distance_km:
+        near, too_far = [], 0
+        for p in deduped:
+            if limit is not None and len(near) >= limit:
+                break
+            addr = clean_address_for_maps(p.get('address', ''))
+            loc = geocode_jp(addr) if addr else None
+            if loc is None:
+                # 住所不明・座標を特定できない場合は判断できないため残す
+                near.append(p)
+                continue
+            d = distance_km(origin, loc)
+            p['distance_km'] = round(d, 1)
+            if d <= max_distance_km:
+                near.append(p)
+            else:
+                too_far += 1
+        if too_far > 0:
+            print(f"    勤務先から{max_distance_km:.0f}km超のため除外: {too_far}件")
+        deduped = near
+
+    # ⑥ 件数上限
     if limit is not None:
         deduped = deduped[:limit]
     return deduped
@@ -1502,7 +1645,8 @@ async def search_homemate(page, area: str, shot_dir: Path,
 async def extract_homemate_properties(page, ctx, shot_dir: Path,
                                        rent_max: int = None,
                                        limit: int = 3,
-                                       area: str = '') -> list[dict]:
+                                       area: str = '',
+                                       layout: str = '') -> list[dict]:
     """東建ルームサーチの検索結果ページ(#ta_bukkenlist)から物件情報を抽出する。
 
     以前は一覧テーブルの先頭 limit 行だけを無条件に採用していたため、
@@ -1683,7 +1827,7 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
             })
 
         if rent_max is not None:
-            selected = filter_properties(all_rows, rent_max, limit=limit)
+            selected = filter_properties(all_rows, rent_max, limit=limit, layout=layout)
         else:
             selected = all_rows[:limit]
         print(f"  東建 採用: {len(selected)}件（規定内・同一建物1件・上限に近い順）")
@@ -2917,6 +3061,18 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
             'source':   'reabro',
         })
 
+    # リアブロにはレオパレス21（レオパレス／レオネクスト ブランド）の物件も
+    # 掲載されているが、レオパレスは専用サイトで別途検索しているため重複する。
+    # 実務でも手作業の物出しではリアブロのレオパレス物件は避けているため、
+    # ここで除外する。
+    leo_pattern = re.compile(r'レオパレス|レオネクスト|LEOPALACE|LEONEXT', re.IGNORECASE)
+    before_leo = len(result)
+    result = [p for p in result
+              if not leo_pattern.search(unicodedata.normalize('NFKC', p.get('name', '')))]
+    if before_leo != len(result):
+        print(f"  リアブロ: レオパレス系物件を除外 {before_leo - len(result)}件"
+              f"（レオパレスは専用サイトで検索するため）")
+
     print(f"  リアブロ 物件数: {len(result)}")
     for p in result[:5]:
         print(f"    {p['name'][:30]} / {p.get('rent', '')} / room_id={p['room_id']}")
@@ -3528,7 +3684,7 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
                 if ok:
                     hm_props = await extract_homemate_properties(
                         hm_page, ctx, hm_shot_dir,
-                        rent_max=rent_max, limit=3, area=area)
+                        rent_max=rent_max, limit=3, area=area, layout=layout)
                     print(f"  東建: {len(hm_props)}件取得")
 
                     # 物件詳細PDFをダウンロード（hm_page を閉じる前に実行）
@@ -3558,7 +3714,7 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
                 droom_props = await search_droom(droom_page, area, rent_max, droom_shot_dir)
                 print(f"  D-Room: {len(droom_props)}件取得")
                 # 規定内・同一建物1件に絞り込んでから、その物件だけをPDF化する
-                droom_props = filter_properties(droom_props, rent_max, limit=3)
+                droom_props = filter_properties(droom_props, rent_max, limit=3, layout=layout)
                 if droom_props:
                     droom_bulk_pdf = await download_droom_bulk_pdf(
                         droom_page, case_dir,
@@ -3636,11 +3792,11 @@ async def process_case(playwright, case: dict, case_num: int, font_name: str):
 
         # ⑥-a 絞り込み（規定額内・同一建物1件・家賃が上限に近い順／同額なら築浅順）
         print(f"  ── 物件絞り込み（規定内 / 同一建物1件 / 家賃が上限に近い順 / 同額なら築年数新しい順）──")
-        atbb_props   = filter_properties(atbb_props,   rent_max, limit=3)
-        hm_props     = filter_properties(hm_props,     rent_max, limit=3)
-        droom_props  = filter_properties(droom_props,  rent_max, limit=3)
-        lp_props     = filter_properties(lp_props,     rent_max, limit=3)
-        reabro_props = filter_properties(reabro_props, rent_max, limit=3)
+        atbb_props   = filter_properties(atbb_props,   rent_max, limit=3, layout=layout)
+        hm_props     = filter_properties(hm_props,     rent_max, limit=3, layout=layout)
+        droom_props  = filter_properties(droom_props,  rent_max, limit=3, layout=layout)
+        lp_props     = filter_properties(lp_props,     rent_max, limit=3, layout=layout)
+        reabro_props = filter_properties(reabro_props, rent_max, limit=3, layout=layout)
 
         properties = []
         # 各ソースの先頭1件を追加
