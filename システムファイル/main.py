@@ -564,6 +564,24 @@ def _parse_rent_yen(rent_str: str) -> int | None:
     return None
 
 
+def total_rent_yen(prop: dict) -> int | None:
+    """社宅規定の判定に使う「総額」（賃料＋管理費・共益費）を円で返す。
+
+    社宅規定の上限は賃料と管理費・共益費の合計で見るため、
+    管理費・共益費（'fee'）が取得できていればそれを加算する。
+    賃料が読み取れない場合は None（判断不能）。
+    """
+    rent = _parse_rent_yen(prop.get('rent', ''))
+    if rent is None:
+        return None
+    fee_raw = prop.get('fee', '')
+    if fee_raw and not re.search(r'なし|無料|込|-|―', str(fee_raw)):
+        fee = _parse_rent_yen(fee_raw)
+        if fee is not None:
+            return rent + fee
+    return rent
+
+
 def _parse_age_years(age_str: str) -> int | None:
     """
     築年数文字列を年数（int）に変換する。
@@ -756,7 +774,8 @@ def filter_properties(
     """
     wanted_layouts = parse_layout_spec(layout)
     def _sort_key(p):
-        rent_yen = _parse_rent_yen(p.get('rent', ''))
+        # 規定額の判定・並べ替えは賃料＋管理費・共益費の総額で行う
+        rent_yen = total_rent_yen(p)
         age = _parse_age_years(p.get('age', ''))
         age_val = age if age is not None else 9999
         if rent_yen is None:
@@ -769,7 +788,7 @@ def filter_properties(
     over_rent = 0
     wrong_layout = 0
     for p in props:
-        rent_yen = _parse_rent_yen(p.get('rent', ''))
+        rent_yen = total_rent_yen(p)
         if rent_yen is not None and rent_yen > rent_max:
             over_rent += 1
             continue
@@ -787,7 +806,7 @@ def filter_properties(
         within.append(p)
 
     if over_rent > 0:
-        print(f"    規定外（家賃上限{rent_max:,}円超）のため除外: {over_rent}件")
+        print(f"    規定外（賃料＋管理費・共益費が{rent_max:,}円超）のため除外: {over_rent}件")
     if wrong_layout > 0:
         print(f"    希望間取り（{'/'.join(sorted(wanted_layouts))}）以外のため除外: {wrong_layout}件")
 
@@ -1722,7 +1741,7 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                     const is_top = cells.length >= 10 ||
                                    (cells[0] && cells[0].className.includes('td_top'));
 
-                    let room='', floor='', rent='', layout='', area='', built='', href='';
+                    let room='', floor='', rent='', fee='', layout='', area='', built='', href='';
 
                     if (is_top) {
                         // ── 建物ヘッダー行 (11セル) ──
@@ -1751,10 +1770,12 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                         const rf2 = parseRoomFloor(c2t);
                         room = rf2.room; floor = rf2.floor;
 
-                        // cell3: 賃料
+                        // cell3: 「賃料共益費」列。賃料と共益費が続けて入っている
+                        // （例: "5.1万円0.5万円" → 賃料5.1万円 / 共益費0.5万円）
                         const c3t = cells[3] ? cells[3].textContent.trim() : '';
-                        const rm3 = c3t.match(/(\\d+\\.?\\d*)万円/);
-                        rent = rm3 ? rm3[1]+'万円' : '';
+                        const am3 = c3t.match(/\\d+\\.?\\d*万円/g) || [];
+                        rent = am3[0] || '';
+                        fee  = am3[1] || '';
 
                         // cell7: 間取り+面積
                         const c7t = cells[7] ? cells[7].textContent.trim() : '';
@@ -1779,10 +1800,11 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                         const rf0 = parseRoomFloor(c0t);
                         room = rf0.room; floor = rf0.floor;
 
-                        // cell1: 賃料
+                        // cell1: 「賃料共益費」列（ヘッダー行と同じ並び）
                         const c1t = cells[1] ? cells[1].textContent.trim() : '';
-                        const rm1 = c1t.match(/(\\d+\\.?\\d*)万円/);
-                        rent = rm1 ? rm1[1]+'万円' : '';
+                        const am1 = c1t.match(/\\d+\\.?\\d*万円/g) || [];
+                        rent = am1[0] || '';
+                        fee  = am1[1] || '';
 
                         // cell5: 間取り+面積
                         const c5t = cells[5] ? cells[5].textContent.trim() : '';
@@ -1813,7 +1835,7 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
 
                     props.push({
                         name: cur_name, address: cur_addr, station: cur_station,
-                        room: room, floor: floor, rent: rent,
+                        room: room, floor: floor, rent: rent, fee: fee,
                         layout: layout, area: area, age: age,
                         detail_href: href, img_url: cur_img
                     });
@@ -1839,6 +1861,7 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                 # （「港区」が東京都と大阪市の双方に存在する等の誤認を防ぐ）
                 "address": ensure_prefecture(r.get('address', ''), area),
                 "rent": r.get('rent', ''),
+                "fee": r.get('fee', ''),
                 "layout": r.get('layout', ''),
                 "area": r.get('area', ''),
                 "age": r.get('age', ''),
@@ -2509,6 +2532,15 @@ async def search_leopalace(page, area: str, rent_max: int, shot_dir: Path,
                             break;
                         }
                     }
+                    // 共益費: 「（共益費 8,000円）」の形で別途表示される。
+                    // レオパレスは共益費が定額で高め（8,000円等）なため、
+                    // 賃料だけで規定額を判定すると総額では規定外の物件を
+                    // 提示してしまう。必ず拾って総額判定に使う。
+                    let fee = '';
+                    for (const l of lines) {
+                        const fm = l.match(/共益費[^\\d]*([\\d,]+)\\s*円/);
+                        if (fm) { fee = fm[1] + '円'; break; }
+                    }
                     // 間取り: 1K/1R等
                     const layoutLine = lines.find(l => l.match(/^[1-4][RKLDK]+$/));
                     // 面積
@@ -2518,6 +2550,7 @@ async def search_leopalace(page, area: str, rent_max: int, shot_dir: Path,
                         name: name.substring(0, 40),
                         address: address.substring(0, 60),
                         rent: rent,
+                        fee: fee,
                         layout: layoutLine || '',
                         area: areaLine || ''
                     };
@@ -2532,10 +2565,13 @@ async def search_leopalace(page, area: str, rent_max: int, shot_dir: Path,
     print(f"  建物カード: {len(prop_links)}件")
 
     results = []
-    for pl in prop_links[:5]:
+    # 共益費を含めた総額での規定額判定や間取り・距離の絞り込みで候補が
+    # 減るため、一覧からは多めに拾っておく（提示件数の上限は呼び出し側で制御）
+    for pl in prop_links[:20]:
         results.append({
             'name': pl['name'] or pl['href'].split('/')[-1][:30],
             'rent': pl['rent'],
+            'fee': pl.get('fee', ''),
             'layout': pl['layout'],
             'area': pl['area'],
             'address': pl['address'] or area,
