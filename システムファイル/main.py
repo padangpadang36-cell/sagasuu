@@ -581,6 +581,27 @@ def _parse_age_years(age_str: str) -> int | None:
     return None
 
 
+def is_specific_address(addr: str) -> bool:
+    """住所が町名まで含む具体的なものかどうかを判定する。
+
+    サイト側のデータ不備で「京都府京都市南区39-9」のように市区町村の直後が
+    いきなり番地になっている（町名が欠落している）ことがある。
+    この住所で地図を描いたり距離を測ったりすると全く違う場所を指してしまう
+    ため、そのような住所は「位置不明」として扱う。
+    """
+    if not addr:
+        return False
+    s = strip_pref_prefix(addr.strip())
+    # 政令指定都市（○○市△△区）とそれ以外の市区町村を切り出す
+    m = re.match(r'^(.+?市.+?区|.+?[市区町村])', s)
+    if not m:
+        return True  # 市区町村を判別できないものは判断保留（許容）
+    rest = s[m.end():].strip()
+    if not rest:
+        return False
+    return not re.match(r'^[0-9０-９]', rest)
+
+
 _GEOCODE_CACHE: dict = {}
 
 
@@ -597,10 +618,13 @@ def geocode_jp(address: str):
     import urllib.parse as _parse
     import json as _json
     result = None
-    # 住所が詳細すぎて引けない場合に備え、末尾を段階的に削って再試行する
+    # 住所が詳細すぎて引けない場合に備え、末尾を段階的に削って再試行する。
+    # ただし市区町村までしか残らない場合は、その座標は市区町村の代表点で
+    # あって物件の位置ではないため、フォールバック先には含めない
+    # （距離判定を誤らせるより「不明」として扱うほうが安全）。
     candidates = [key]
     trimmed = re.sub(r'[0-9０-９][0-9０-９\-－ー番地号丁目の]*$', '', key).strip()
-    if trimmed and trimmed != key:
+    if trimmed and trimmed != key and not re.fullmatch(r'.*?[市区町村]', trimmed):
         candidates.append(trimmed)
     for cand in candidates:
         try:
@@ -791,7 +815,8 @@ def filter_properties(
             if limit is not None and len(near) >= limit:
                 break
             addr = clean_address_for_maps(p.get('address', ''))
-            loc = geocode_jp(addr) if addr else None
+            # 町名が欠落した住所は座標を特定できても別の場所を指すため使わない
+            loc = geocode_jp(addr) if (addr and is_specific_address(addr)) else None
             if loc is None:
                 # 住所不明・座標を特定できない場合は判断できないため残す
                 near.append(p)
@@ -3383,6 +3408,11 @@ async def get_maps_screenshot(page, from_addr: str, to_addr: str, out_path: str,
     """
     from urllib.parse import quote
     from_addr = clean_address_for_maps(from_addr)
+    # 町名が欠落した住所（例: 「京都府京都市南区39-9」）でマップを開くと
+    # 全く別の場所が表示されてしまうため、地図は作らない
+    if not is_specific_address(from_addr):
+        print(f"    ⚠ 住所に町名が含まれておらず場所を特定できないため地図を作成しません: {from_addr}")
+        return False
     travel_mode = _commute_travel_mode(commute_method)
     print(f"  地図取得: {from_addr[:30]} → {to_addr[:30]}  [{travel_mode}]")
     url = (

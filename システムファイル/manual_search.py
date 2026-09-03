@@ -51,6 +51,7 @@ from main import (
     search_leopalace, download_leopalace_pdf,
     login_reabro, search_reabro, download_reabro_pdfs, get_reabro_address,
     geocode_jp, distance_km, default_distance_limit_km, clean_address_for_maps,
+    is_specific_address,
     clean_droom_address, append_labeled_maps_to_pdf,
 )
 
@@ -342,7 +343,7 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                             rp['address'] = addr
                             print(f"  リアブロ住所取得: {addr}")
                         # 勤務先から遠すぎる物件は採用せず次の候補へ
-                        if origin and max_km and addr:
+                        if origin and max_km and addr and is_specific_address(addr):
                             loc = geocode_jp(clean_address_for_maps(addr))
                             if loc:
                                 d = distance_km(origin, loc)
