@@ -564,22 +564,61 @@ def _parse_rent_yen(rent_str: str) -> int | None:
     return None
 
 
-def total_rent_yen(prop: dict) -> int | None:
-    """社宅規定の判定に使う「総額」（賃料＋管理費・共益費）を円で返す。
+def total_rent_yen(prop: dict, include_fee: bool = True) -> int | None:
+    """規定額の判定に使う金額を円で返す。
 
-    社宅規定の上限は賃料と管理費・共益費の合計で見るため、
-    管理費・共益費（'fee'）が取得できていればそれを加算する。
+    include_fee=True  … 賃料＋管理費・共益費の総額（共益費込みの規定）
+    include_fee=False … 賃料のみ（共益費抜きの規定）
     賃料が読み取れない場合は None（判断不能）。
     """
     rent = _parse_rent_yen(prop.get('rent', ''))
     if rent is None:
         return None
+    if not include_fee:
+        return rent
     fee_raw = prop.get('fee', '')
     if fee_raw and not re.search(r'なし|無料|込|-|―', str(fee_raw)):
         fee = _parse_rent_yen(fee_raw)
         if fee is not None:
             return rent + fee
     return rent
+
+
+def parse_available_date(s: str):
+    """入居可能日の表記を date に変換する。
+
+    '即可' / '即入居可' / '相談' → 今日（いつでも入居できる扱い）
+    '2026/09/14' → 2026-09-14
+    '2026/09' → 2026-09-01（月のみの場合はその月の初日とみなす）
+    '2026年9月下旬' → 2026-09-21（上旬=1日/中旬=11日/下旬=21日）
+    解析できない場合は None（判断不能としてフィルタをスキップ）。
+    """
+    if not s:
+        return None
+    t = unicodedata.normalize('NFKC', str(s)).strip()
+    if not t:
+        return None
+    if re.search(r'即|相談|随時|空|可$', t) and not re.search(r'\d{4}', t):
+        return jst_now().date()
+    m = re.search(r'(\d{4})[/年\-.](\d{1,2})[/月\-.](\d{1,2})', t)
+    if m:
+        try:
+            return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3))).date()
+        except ValueError:
+            return None
+    m = re.search(r'(\d{4})[/年\-.](\d{1,2})', t)
+    if m:
+        try:
+            y, mo = int(m.group(1)), int(m.group(2))
+            day = 1
+            if '中旬' in t:
+                day = 11
+            elif '下旬' in t:
+                day = 21
+            return datetime(y, mo, day).date()
+        except ValueError:
+            return None
+    return None
 
 
 def _parse_age_years(age_str: str) -> int | None:
@@ -758,13 +797,18 @@ def filter_properties(
     layout: str = '',
     origin: tuple = None,
     max_distance_km: float = None,
+    include_fee: bool = True,
+    move_in_by=None,
 ) -> list[dict]:
     """
     物件リストを「規定内のみ」に絞り込み、同一建物を1件に集約して並べ替える。
 
     ① 家賃が上限（規定額）を超える物件は除外する。
+       include_fee=True なら賃料＋管理費・共益費の総額、False なら賃料のみで判定する。
        ※ 規定額は社宅規定の上限であり、超過物件を提示してはいけない。
          家賃が読み取れなかった物件は判断できないため残す（並びは末尾）。
+    ①-2 move_in_by が指定されている場合、その日までに入居できない物件は除外する。
+       入居可能日が読み取れない物件は判断できないため残す。
     ② 希望間取りが指定されている場合、それ以外の間取りは除外する。
        間取りが読み取れない物件は判断できないため残す。
     ③ 築年数の上限が指定されている場合はそれを超える物件を除外する。
@@ -774,8 +818,8 @@ def filter_properties(
     """
     wanted_layouts = parse_layout_spec(layout)
     def _sort_key(p):
-        # 規定額の判定・並べ替えは賃料＋管理費・共益費の総額で行う
-        rent_yen = total_rent_yen(p)
+        # 規定額の判定・並べ替えは規定の基準（共益費込み/抜き）に合わせる
+        rent_yen = total_rent_yen(p, include_fee)
         age = _parse_age_years(p.get('age', ''))
         age_val = age if age is not None else 9999
         if rent_yen is None:
@@ -787,11 +831,18 @@ def filter_properties(
     within = []
     over_rent = 0
     wrong_layout = 0
+    late_move_in = 0
     for p in props:
-        rent_yen = total_rent_yen(p)
+        rent_yen = total_rent_yen(p, include_fee)
         if rent_yen is not None and rent_yen > rent_max:
             over_rent += 1
             continue
+        # 入居希望日までに入居できない物件は除外する
+        if move_in_by is not None:
+            avail = parse_available_date(p.get('available_from', ''))
+            if avail is not None and avail > move_in_by:
+                late_move_in += 1
+                continue
         if wanted_layouts:
             lay = normalize_layout(p.get('layout', ''))
             # 間取りが読み取れない物件は判断できないため残す
@@ -806,7 +857,10 @@ def filter_properties(
         within.append(p)
 
     if over_rent > 0:
-        print(f"    規定外（賃料＋管理費・共益費が{rent_max:,}円超）のため除外: {over_rent}件")
+        basis = "賃料＋管理費・共益費" if include_fee else "賃料"
+        print(f"    規定外（{basis}が{rent_max:,}円超）のため除外: {over_rent}件")
+    if late_move_in > 0:
+        print(f"    入居希望日（{move_in_by}）までに入居できないため除外: {late_move_in}件")
     if wrong_layout > 0:
         print(f"    希望間取り（{'/'.join(sorted(wanted_layouts))}）以外のため除外: {wrong_layout}件")
 
@@ -1690,7 +1744,9 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                                        rent_max: int = None,
                                        limit: int = 3,
                                        area: str = '',
-                                       layout: str = '') -> list[dict]:
+                                       layout: str = '',
+                                       include_fee: bool = True,
+                                       move_in_by=None) -> list[dict]:
     """東建ルームサーチの検索結果ページ(#ta_bukkenlist)から物件情報を抽出する。
 
     以前は一覧テーブルの先頭 limit 行だけを無条件に採用していたため、
@@ -1741,7 +1797,26 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                     const is_top = cells.length >= 10 ||
                                    (cells[0] && cells[0].className.includes('td_top'));
 
-                    let room='', floor='', rent='', fee='', layout='', area='', built='', href='';
+                    let room='', floor='', rent='', fee='', layout='', area='',
+                        built='', avail='', href='';
+
+                    // 「完成年月入居可能日」列（例: "1999/062026/09/14" =
+                    // 完成1999/06・入居可能2026/09/14、"2026/06即可" = 即入居可）
+                    // から完成年月と入居可能日を切り分ける
+                    const splitBuiltAvail = (txt) => {
+                        const bm = txt.match(/^(\\d{4})\\/(\\d{2})/);
+                        const b = bm ? bm[1]+'/'+bm[2] : '';
+                        const rest = bm ? txt.slice(bm[0].length) : txt;
+                        let a = '';
+                        if (/即/.test(rest)) {
+                            a = '即可';
+                        } else {
+                            const am = rest.match(/\\d{4}\\/\\d{1,2}\\/\\d{1,2}/)
+                                    || rest.match(/\\d{4}\\/\\d{1,2}/);
+                            if (am) a = am[0];
+                        }
+                        return [b, a];
+                    };
 
                     if (is_top) {
                         // ── 建物ヘッダー行 (11セル) ──
@@ -1784,10 +1859,10 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                         layout = lm7 ? lm7[1] : '';
                         area   = am7 ? am7[1]+'㎡' : '';
 
-                        // cell8: "2021/052026/07/30" → 完成年月
+                        // cell8: "2021/052026/07/30" → 完成年月＋入居可能日
                         const c8t = cells[8] ? cells[8].textContent.trim() : '';
-                        const bm8 = c8t.match(/^(\\d{4})\\/(\\d{2})/);
-                        built = bm8 ? bm8[1]+'/'+bm8[2] : '';
+                        const ba8 = splitBuiltAvail(c8t);
+                        built = ba8[0]; avail = ba8[1];
 
                         // cell10: 詳細リンク
                         const dl10 = cells[10] ? cells[10].querySelector('a') : null;
@@ -1813,10 +1888,10 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                         layout = lm5 ? lm5[1] : '';
                         area   = am5 ? am5[1]+'㎡' : '';
 
-                        // cell6: 完成年月
+                        // cell6: 完成年月＋入居可能日
                         const c6t = cells[6] ? cells[6].textContent.trim() : '';
-                        const bm6 = c6t.match(/^(\\d{4})\\/(\\d{2})/);
-                        built = bm6 ? bm6[1]+'/'+bm6[2] : '';
+                        const ba6 = splitBuiltAvail(c6t);
+                        built = ba6[0]; avail = ba6[1];
 
                         // cell8: 詳細リンク
                         const dl8 = cells[8] ? cells[8].querySelector('a') : null;
@@ -1836,7 +1911,7 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                     props.push({
                         name: cur_name, address: cur_addr, station: cur_station,
                         room: room, floor: floor, rent: rent, fee: fee,
-                        layout: layout, area: area, age: age,
+                        layout: layout, area: area, age: age, avail: avail,
                         detail_href: href, img_url: cur_img
                     });
                 }
@@ -1862,6 +1937,7 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
                 "address": ensure_prefecture(r.get('address', ''), area),
                 "rent": r.get('rent', ''),
                 "fee": r.get('fee', ''),
+                "available_from": r.get('avail', ''),
                 "layout": r.get('layout', ''),
                 "area": r.get('area', ''),
                 "age": r.get('age', ''),
@@ -1875,7 +1951,8 @@ async def extract_homemate_properties(page, ctx, shot_dir: Path,
             })
 
         if rent_max is not None:
-            selected = filter_properties(all_rows, rent_max, limit=limit, layout=layout)
+            selected = filter_properties(all_rows, rent_max, limit=limit, layout=layout,
+                                         include_fee=include_fee, move_in_by=move_in_by)
         else:
             selected = all_rows[:limit]
         print(f"  東建 採用: {len(selected)}件（規定内・同一建物1件・上限に近い順）")
@@ -2224,7 +2301,7 @@ async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
                 // bukken_name 属性から建物名を取得
                 const bukkenName = (cb.getAttribute('bukken_name') || cb.value).trim();
                 const row = cb.closest('tr');
-                let address = '', rent = '', layout = '', area = '';
+                let address = '', rent = '', fee = '', avail = '', layout = '', area = '';
 
                 if (row) {
                     // 前の5行を調べて住所・賃料を探す
@@ -2237,10 +2314,19 @@ async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
                             const addrPart = text.split(' - ')[0].split('　')[0].trim();
                             if (addrPart.length > 5) address = addrPart.substring(0, 60);
                         }
-                        // 賃料行
+                        // 賃料行（「94,000円 / 5,500円」= 賃料 / 共益費）
                         if (!rent) {
-                            const rentMatch = text.match(/(\\d{2,3},\\d{3})円/);
-                            if (rentMatch) rent = rentMatch[0];
+                            const amts = text.match(/\\d{1,3},\\d{3}円/g) || [];
+                            if (amts.length) {
+                                rent = amts[0];
+                                if (amts.length > 1) fee = amts[1];
+                            }
+                        }
+                        // 入居可能日（「即入居可」または「2026年9月1日」等）
+                        if (!avail) {
+                            const av = text.match(
+                                /(即入居可|即入居|相談|\\d{4}年\\d{1,2}月\\d{1,2}日|\\d{4}年\\d{1,2}月)/);
+                            if (av) avail = av[0];
                         }
                         // 面積
                         if (!area) {
@@ -2258,7 +2344,8 @@ async def search_droom(page, area: str, rent_max: int, shot_dir: Path) -> list:
                 results.push({
                     room_id: cb.value,
                     name: bukkenName.substring(0, 40),
-                    address, rent, layout, area, station: ''
+                    address, rent, fee, layout, area, station: '',
+                    available_from: avail
                 });
             }
             return results;
@@ -2709,9 +2796,15 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                 if (!room_id || !/^\\d+$/.test(room_id)) return;
                 const row = el.closest('tr') || el.closest('li') || el.parentElement;
                 const text = row ? row.innerText.replace(/\\s+/g,' ').trim() : '';
-                let rent = '', layout = '', sq = '';
-                const rentM = text.match(/([\\d,]+\\.?\\d*)(万円|円)/);
-                if (rentM) rent = rentM[0];
+                let rent = '', fee = '', avail = '', layout = '', sq = '';
+                // 行には「43,000円 11,000円 …」の順で賃料・管理費/共益費が並ぶ
+                const amounts = text.match(/[\\d,]+\\.?\\d*(?:万円|円)/g) || [];
+                rent = amounts[0] || '';
+                fee  = amounts[1] || '';
+                // 入居可能時期（例: "即入" / "相談" / "2026年09月06日"）
+                const availM = text.match(
+                    /(即入居可|即入|相談|\\d{4}年\\d{1,2}月\\d{1,2}日|\\d{4}年\\d{1,2}月)/);
+                if (availM) avail = availM[0];
                 const layoutM = text.match(/([1-9][LKDS]+|ワンルーム)/i);
                 if (layoutM) layout = layoutM[0];
                 const sqM = text.match(/\\d+\\.?\\d*㎡/);
@@ -2720,7 +2813,8 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
                     room_id:       room_id,
                     building_name: (parts[1] || '').trim(),
                     room_name:     (parts[2] || '').trim(),
-                    rent: rent, layout: layout, area: sq
+                    rent: rent, fee: fee, avail: avail,
+                    layout: layout, area: sq
                 });
             });
             return results;
@@ -3116,6 +3210,8 @@ async def search_reabro(page, area: str, rent_max: int, shot_dir: Path,
             'building': building,
             'address':  r.get('address', ''),
             'rent':     r.get('rent', ''),
+            'fee':      r.get('fee', ''),
+            'available_from': r.get('avail', ''),
             'layout':   r.get('layout', ''),
             'area':     r.get('area', ''),
             'station':  '',

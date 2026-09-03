@@ -13,7 +13,7 @@ import re
 import sys
 import subprocess
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
 
 import streamlit as st
@@ -170,6 +170,17 @@ with tab_manual:
 
         manual_rent = st.number_input("家賃上限（円）*", min_value=0, max_value=500000,
                                       value=80000, step=5000, key="manual_rent")
+        manual_incl_fee = st.checkbox("共益費・管理費を含めて判定する", value=True,
+                                      key="manual_incl_fee")
+        st.caption("チェックあり: 賃料＋共益費の総額が上限以内か／"
+                   "チェックなし: 賃料のみで判定")
+
+        manual_movein_on = st.checkbox("入居希望日で絞り込む", value=False, key="manual_movein_on")
+        manual_movein = st.date_input("入居希望日（就業開始日）",
+                                      value=date.today(), key="manual_movein",
+                                      disabled=not manual_movein_on)
+        st.caption("この日までに入居できない物件は提示しません"
+                   "（入居可能日が取得できないサイトの物件は判断できないため残します）")
 
         work_pref_col, work_free_col = st.columns([1, 2])
         with work_pref_col:
@@ -232,6 +243,8 @@ with tab_manual:
                 "希望間取り":      manual_layout.strip(),
                 "通勤方法":        manual_commute.strip(),
                 "距離上限km":      (manual_dist if manual_dist > 0 else None),
+                "共益費込み":      bool(manual_incl_fee),
+                "入居希望日":      (manual_movein.isoformat() if manual_movein_on else None),
                 "氏名":            manual_name.strip(),
                 "管理番号":        manual_anken.strip() or "手動検索",
                 "sites":           sites,
@@ -290,6 +303,7 @@ with tab_manual:
                         "間取り": p.get("layout", ""),
                         "面積": p.get("area", ""),
                         "築年数": p.get("age", ""),
+                        "入居可能": p.get("available_from", ""),
                         "勤務先まで": (f"{p['distance_km']}km" if p.get("distance_km") is not None else ""),
                         "住所": p.get("address", ""),
                     } for p in properties]

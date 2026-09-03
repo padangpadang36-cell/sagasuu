@@ -23,6 +23,7 @@ import argparse
 import json
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != 'utf-8':
@@ -65,6 +66,14 @@ async def run_manual_search(params: dict):
     name         = params.get("氏名", params.get("name", "手動検索"))
     case_id      = params.get("管理番号", params.get("case_id", "")) or f"手動_{jst_now().strftime('%Y%m%d_%H%M%S')}"
     sites        = [s.strip() for s in params.get("sites", [])]
+    include_fee  = bool(params.get("共益費込み", params.get("include_fee", True)))
+    move_in_raw  = params.get("入居希望日", params.get("move_in_by"))
+    move_in_by   = None
+    if move_in_raw:
+        try:
+            move_in_by = datetime.fromisoformat(str(move_in_raw)).date()
+        except ValueError:
+            print(f"  ⚠ 入居希望日を解釈できません（無視します）: {move_in_raw!r}")
 
     case_id = re.sub(r'[\\/:*?"<>|]', "_", case_id).strip()
     case_dir = OUTPUT_DIR / case_id
@@ -82,6 +91,9 @@ async def run_manual_search(params: dict):
     print(f"検索開始: {case_id}")
     print(f"  エリア: {area}  家賃上限: {rent_max:,}円  間取り: {layout}")
     print(f"  選択サイト: {', '.join(sites) if sites else '（なし）'}")
+    print(f"  規定額の判定: {'賃料＋管理費・共益費の総額' if include_fee else '賃料のみ'}")
+    if move_in_by:
+        print(f"  入居希望日: {move_in_by} までに入居できる物件のみ")
 
     # 勤務先から遠すぎる物件を提示しないための距離条件
     # （指定が無ければ通勤方法から既定値を決める）
@@ -112,7 +124,8 @@ async def run_manual_search(params: dict):
         try:
             await _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                                   work_address, commute, shot_dir, case_dir, case_id, font_name, all_props,
-                                  origin=origin, max_km=max_km)
+                                  origin=origin, max_km=max_km,
+                                  include_fee=include_fee, move_in_by=move_in_by)
         finally:
             await browser.close()
 
@@ -173,7 +186,8 @@ RESULT_LIMIT = 3
 
 async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                           work_address, commute, shot_dir, case_dir, case_id, font_name, all_props,
-                          origin=None, max_km=None):
+                          origin=None, max_km=None,
+                          include_fee=True, move_in_by=None):
         # 通勤ルート地図の取得専用ページ（サイトへのログイン不要）
         map_page = await ctx.new_page() if work_address else None
         # ── ATBB ─────────────────────────────────────────────
@@ -189,7 +203,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                         p['source'] = 'atbb'
                         p['atbb_idx'] = idx
                     props = filter_properties(props, rent_max, limit=RESULT_LIMIT, layout=layout,
-                                              origin=origin, max_distance_km=max_km)
+                                              origin=origin, max_distance_km=max_km,
+                                              include_fee=include_fee, move_in_by=move_in_by)
                     print(f"  ATBB: {len(props)}件取得（フィルター後）")
                     for idx, p in enumerate(props):
                         dp = await download_atbb_print_pdf(page, ctx, pw, p.get('atbb_idx', idx),
@@ -219,9 +234,10 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                         props = await extract_homemate_properties(
                             page, ctx, hm_shot,
                             rent_max=rent_max, limit=RESULT_LIMIT, area=area,
-                            layout=layout)
+                            layout=layout, include_fee=include_fee, move_in_by=move_in_by)
                         props = filter_properties(props, rent_max, limit=RESULT_LIMIT, layout=layout,
-                                              origin=origin, max_distance_km=max_km)
+                                              origin=origin, max_distance_km=max_km,
+                                              include_fee=include_fee, move_in_by=move_in_by)
                         print(f"  東建: {len(props)}件取得（フィルター後）")
                         for idx, hp in enumerate(props):
                             if hp.get('detail_href'):
@@ -247,7 +263,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 if await login_droom(page, dr_shot):
                     props = await search_droom(page, area, rent_max, dr_shot)
                     props = filter_properties(props, rent_max, limit=RESULT_LIMIT, layout=layout,
-                                              origin=origin, max_distance_km=max_km)
+                                              origin=origin, max_distance_km=max_km,
+                                              include_fee=include_fee, move_in_by=move_in_by)
                     print(f"  D-Room: {len(props)}件取得（フィルター後）")
                     for p in props:
                         p['source'] = 'droom'
@@ -293,7 +310,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                 lp_shot.mkdir(exist_ok=True)
                 props = await search_leopalace(page, area, rent_max, lp_shot, work_address=work_address)
                 props = filter_properties(props, rent_max, limit=RESULT_LIMIT, layout=layout,
-                                              origin=origin, max_distance_km=max_km)
+                                              origin=origin, max_distance_km=max_km,
+                                              include_fee=include_fee, move_in_by=move_in_by)
                 print(f"  レオパレス: {len(props)}件取得（フィルター後）")
                 for idx, p in enumerate(props):
                     p['source'] = 'leopalace'
@@ -323,7 +341,8 @@ async def _run_all_sites(ctx, pw, sites, area, rent_max, layout,
                     # 取得できない。そのため距離の絞り込みはここでは行わず、
                     # 家賃・間取り・同一建物の集約だけを済ませた候補リストを作り、
                     # 家賃順に1件ずつ住所を取得しながら距離を判定して採用する。
-                    candidates = filter_properties(props, rent_max, layout=layout)
+                    candidates = filter_properties(props, rent_max, layout=layout,
+                                                   include_fee=include_fee, move_in_by=move_in_by)
                     print(f"  リアブロ: 候補{len(candidates)}件から最大{RESULT_LIMIT}件を選定します")
                     selected = []
                     too_far = 0
